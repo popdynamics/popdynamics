@@ -1,9 +1,9 @@
 
-basepop
+# basepop
 
 a library for flexible epidemiological modelling
 
-# Requirements
+## Requirements
 
 - python 2.7
 - numpy
