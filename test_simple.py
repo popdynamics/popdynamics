@@ -71,7 +71,9 @@ class SimplifiedModel(BaseModel):
 
         curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
         curve2 = make_sigmoidal_curve(y_high=4, y_low=2, x_start=1995, x_inflect=2003, multiplier=3)
-        self.test_curve = lambda x: curve1(x) if x < 1990 else curve2(x)
+        test_curve = lambda x: curve1(x) if x < 1990 else curve2(x)
+        self.set_scaleup_fn("program_rate_detect", test_curve)
+
 
     def calculate_vars(self):
         self.vars["population"] = sum(self.compartments.values())
@@ -88,8 +90,6 @@ class SimplifiedModel(BaseModel):
             self.params["tb_n_contact"] \
             * self.vars["infectious_population"] \
             / self.vars["population"]
-
-        self.vars["program_rate_detect"] = self.test_curve(self.time)
 
     def set_flows(self):
         self.set_var_entry_rate_flow("susceptible", "rate_birth")
@@ -121,7 +121,7 @@ class SimplifiedModel(BaseModel):
         self.set_fixed_transfer_rate_flow(
             "treatment_noninfect", "active", "program_rate_default_noninfect")
 
-        self.set_population_death_rate("demo_rate_death")
+        self.set_background_death_rate("demo_rate_death")
         self.set_infection_death_rate_flow(
             "active", "tb_rate_death")
         self.set_infection_death_rate_flow(
@@ -168,7 +168,7 @@ model.integrate_explicit()
 
 model.make_graph(os.path.join(out_dir, 'workflow'))
 
-y_vals = [model.test_curve(t) for t in model.times]
+y_vals = [model.scaleup_fns["program_rate_detect"](t) for t in model.times]
 pylab.plot(model.times, y_vals)
 pylab.title('scaleup test curve')
 pylab.savefig(os.path.join(out_dir, 'scaleup.png'))

@@ -37,24 +37,66 @@ def label_intersects_tags(label, tags):
 
 
 class BaseModel():
+    """
+    Basic concept
+      - var - values that are calculated at every time step
+      - param - values that are set at the beginning 
+
+    """
     def __init__(self):
+
+        # labels for all compartments
         self.labels = []
+
+        # stores the initial value for all compartments
         self.init_compartments = {}
+
+        # stores the values of all parameters, there 
+        # should be no hard-coded values except as contained
+        # in this structure
         self.params = {}
+
+        # stores list of time points
         self.times = None
 
+        self.scaleup_fns = {}
+
+        # stores any auxillary variables used to calculate
+        # dynamic transmission at every time-step
         self.vars = {}
+
+        # total flow of each compartment
+        self.flows = {}
+
+        # list of 2-tuple (label, var_label)
+        #   - label: name of compartment
+        #   - var_label: name of var that holds the entry rate
+        self.var_entry_rate_flow = []
+
+        # list of 3-tuple (from_label, to_label, param_label)
+        #   - from_label: name of compartment that loses population
+        #   - to_label: name of compartment that gains population
+        #   - param_label: name of param that holds the rate
+        self.fixed_transfer_rate_flows = []
+
+        # list of 3-tuple (from_label, to_label, var_label)
+        #   - from_label: name of compartment that loses population
+        #   - to_label: name of compartment that gains population
+        #   - var_label: name of var that holds the rate
+        self.var_transfer_rate_flows = []
+
+        # list of 2-tuple (label, rate)
+        #   - label: name of compartment
+        #   - rate: disease specific death rate
+        self.infection_death_rate_flows = []
+
+        # the generalized death rate of all compartments
+        self.background_death_rate = 0.0
 
         self.soln_array = None
         self.var_labels = None
         self.var_array = None
         self.flow_array = None
-
-        self.flows = {}
-        self.fixed_transfer_rate_flows = []
-        self.infection_death_rate_flows = []
-        self.var_transfer_rate_flows = []
-        self.var_flows = []
 
     def make_times(self, start, end, delta):
         "Return steps with n or delta"
@@ -91,8 +133,20 @@ class BaseModel():
     def get_init_list(self):
         return self.convert_compartments_to_list(self.init_compartments)
 
-    def set_population_death_rate(self, death_label):
-        self.death_rate = self.params[death_label]
+    def set_scaleup_fn(self, label, fn):
+
+        """
+        Simple method to add a scale-up function to the dictionary of scale-ups.
+
+        Args:
+            label: String for name of function.
+            fn: The function to be added.
+        """
+
+        self.scaleup_fns[label] = fn
+
+    def set_background_death_rate(self, param_label):
+        self.background_death_rate = self.params[param_label]
 
     def set_infection_death_rate_flow(self, label, param_label):
         add_unique_tuple_to_list(
@@ -104,15 +158,24 @@ class BaseModel():
             self.fixed_transfer_rate_flows,
             (from_label, to_label, self.params[param_label]))
 
-    def set_var_transfer_rate_flow(self, from_label, to_label, vars_label):
+    def set_var_transfer_rate_flow(self, from_label, to_label, var_label):
         add_unique_tuple_to_list(
             self.var_transfer_rate_flows,
-            (from_label, to_label, vars_label))
+            (from_label, to_label, var_label))
 
-    def set_var_entry_rate_flow(self, label, vars_label):
+    def set_var_entry_rate_flow(self, label, var_label):
         add_unique_tuple_to_list(
-            self.var_flows,
-            (label, vars_label))
+            self.var_entry_rate_flow,
+            (label, var_label))
+
+    def calculate_scaleup_vars(self):
+
+        """
+        Find the values of the scale-up functions at a specific point in time. Called within the integration process.
+        """
+
+        for label, fn in self.scaleup_fns.iteritems(): 
+            self.vars[label] = fn(self.time)
 
     def calculate_vars(self):
         """
@@ -123,18 +186,18 @@ class BaseModel():
     def calculate_flows(self):
         """
         Calculate flows, which should only depend on compartment values
-        and self.vars calculated in calculate_vars.
+        and self.vars calculated in self.calculate_vars.
         """
         for label in self.labels:
             self.flows[label] = 0.0
 
         # birth flows
-        for label, vars_label in self.var_flows:
-            self.flows[label] += self.vars[vars_label]
+        for label, var_label in self.var_entry_rate_flow:
+            self.flows[label] += self.vars[var_label]
 
         # dynamic transmission flows
-        for from_label, to_label, vars_label in self.var_transfer_rate_flows:
-            val = self.compartments[from_label] * self.vars[vars_label]
+        for from_label, to_label, var_label in self.var_transfer_rate_flows:
+            val = self.compartments[from_label] * self.vars[var_label]
             self.flows[from_label] -= val
             self.flows[to_label] += val
 
@@ -147,7 +210,7 @@ class BaseModel():
         # normal death flows
         self.vars["rate_death"] = 0.0
         for label in self.labels:
-            val = self.compartments[label] * self.death_rate
+            val = self.compartments[label] * self.background_death_rate
             self.flows[label] -= val
             self.vars['rate_death'] += val
 
@@ -158,14 +221,29 @@ class BaseModel():
             self.flows[label] -= val
             self.vars["rate_infection_death"] += val
 
+
+    def prepare_vars_and_flows(self):
+        """
+        This function collects some other functions that previously 
+        led to a bug because not all of them were called
+        in the diagnostics round.
+        """
+
+        # Clear previously populated vars dictionary
+        self.vars.clear()
+
+        # Calculate vars and flows sequentially
+        self.calculate_scaleup_vars()
+        self.calculate_vars()
+        self.calculate_flows()
+
+
     def make_derivate_fn(self):
 
         def derivative_fn(y, t):
             self.time = t
             self.compartments = self.convert_list_to_compartments(y)
-            self.vars.clear()
-            self.calculate_vars()
-            self.calculate_flows()
+            self.prepare_vars_and_flows()
             flow_vector = self.convert_compartments_to_list(self.flows)
             self.checks()
             return flow_vector
@@ -178,6 +256,15 @@ class BaseModel():
         self.soln_array = None
         self.var_array = None
         self.flow_array = None
+
+        # check that each compartment has an entry flow
+        labels_with_entry = [v[0] for v in self.var_entry_rate_flow]
+        labels_with_var = [v[1] for v in self.var_transfer_rate_flows]
+        labels_with_fixed = [v[1] for v in self.fixed_transfer_rate_flows]
+        labels = labels_with_entry + labels_with_var + labels_with_fixed
+        for label in self.labels:
+            msg = "Compartment '%s' doesn't have any entry or transfer flows" % label
+            assert label in labels, msg
 
     def integrate_scipy(self):
         self.init_run()
@@ -266,7 +353,7 @@ class BaseModel():
                     self.population_soln[label],
                     self.get_var_soln("population")
                 )
-                ]
+            ]
 
     def get_compartment_soln(self, label):
         assert self.soln_array is not None, "calculate_diagnostics has not been run"
@@ -368,13 +455,13 @@ class BaseModel():
         self.graph = Digraph(format='png')
         for label in self.labels:
             self.graph.node(label)
-        self.graph.node("tb_death")
+        self.graph.node("infection_death")
         for from_label, to_label, var_label in self.var_transfer_rate_flows:
             self.graph.edge(from_label, to_label, label=var_label)
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             self.graph.edge(from_label, to_label, label=num_str(rate))
         for label, rate in self.infection_death_rate_flows:
-            self.graph.edge(label, "tb_death", label=num_str(rate))
+            self.graph.edge(label, "infection_death", label=num_str(rate))
         base, ext = os.path.splitext(png)
         if ext.lower() != '.png':
             base = png
