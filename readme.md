@@ -1,9 +1,14 @@
+---
+hello: dddd
+
+---
+
 
 # basepop
 
 a library for flexible epidemiological modelling
 
-## Preamble
+## Why?
 
 - epidemiological models are systems of differential equations
 - reasonably simple equations
@@ -32,8 +37,85 @@ a library for flexible epidemiological modelling
 # Let Python build the model up
 
 - programmatically build up the compartments
+
 - set up links between compartments
+
 - object-oriented programming -> inheritance of objects
+
+- inheritable methods allows separation of concerns
+
+- separate parameter values from generating relationships
+
+- full strings
+  - readable
+  - no need for dereferencing
+  - composable
+  - searchable
+  - holdover from early days 
+
+- design code should be readable
+
+- avoid all acronyms and abbreviations
+
+- learn to construct compartments, cascades programtically
+
+- isolated code is readable
+
+- intermediate is a list and a callback derivative function on the list
+
+- this allows farming out to any math library
+
+- leverages numpy and scipy with hooks out
+
+- because we have constructed with flows then the flowchar can be built using the `grapgviz` library
+
+- use of dictionaries to keep track of items
+
+- items
+
+  - compartments (nodes)
+
+  - flows (edges)
+
+  - params
+
+  - vars
+
+  - saved arrays
+
+  - reconstruct state
+
+  - automatic graphing of nodes and edges
+
+  - organized data in var
+
+  - dynamic transmission
+
+  - easily extensible
+
+  - vectors, and derivatives
+
+    ​
+
+
+# Separation of concerns
+
+One of the approaches in `basepop` is the separation of concerns.
+
+- setting up compartments
+- defining flows between compartments
+- setting up parameters
+- setting up dynamic ransmissions
+- collecting diagnostic variables
+- saving trajectories
+
+
+By intellignently splitting things up, allows:
+
+- creating automatic flow diagrams for debugging
+- allows constructing equations behind the scenes
+- thus freeing the researcher from hgeneral house-keeping and focusing on the model
+
 
 # Concepts
 
@@ -46,6 +128,16 @@ a library for flexible epidemiological modelling
 - allows easy scale-up functions
 
 
+# Examples
+
+- Create a simple model
+- Create a model with dynamic transmission
+- Show how to extract out vectors and derivatives
+- Scale-up function
+- Programmatically generate compartments
+- Programmtically generate diagnostic variables
+- Flow chart
+- Produce graphs with matplotlib - javascript option
 
 ## Requirements
 
@@ -53,15 +145,8 @@ a library for flexible epidemiological modelling
 - numpy
 - scipy 
 - graphviz.py 
-- (graphviz)[http://www.graphviz.org/)
+- graphviz binary on path: http://www.graphviz.org/
 
 
 ## Todo
-- haven't initialized self.death_flow @done
-- initialize birth_flows and death_flows to zero @done
-- added birth_flows check @done
-- generalized death rate/ background_death_rate @done
-- add scale_ups @done
-- examples of modular code: nest & brian simulators
-- more documentation
-- more test_examples
+- test_examples
