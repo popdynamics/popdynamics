@@ -6,11 +6,11 @@ yaml: frontmatter
 
 a library for flexible epidemiological modelling
 
-## Why?
+# Why?
 
 - epidemiological models
-  - systems of differential equations
-  - equations connecting compartments
+  - most frequently consist of systems of differential equations
+  - equations describe relationships between compartments
   - strict conservation of populations
 - typical epidemiological modelling
   - inspired by fortran
@@ -25,22 +25,20 @@ a library for flexible epidemiological modelling
 - `Pythonic` approach
 - the goal
   - focus on the epidemiology 
-  - hide the math
+  - hide the maths
 - alternative view
   - not equation based
   - focus on compartments
-  - and gflows
-  - focus on compartments
   - focus on flows
   - because we have constructed with flows then the flowchar can be built using the `grapgviz` library
-- By intellignently splitting things up, allows:
+- by intelligently splitting things up, allows:
   - creating automatic flow diagrams for debugging
   - allows constructing equations behind the scenes
   - thus freeing the researcher from general house-keeping and focusing on the model
 
 
   - dynamically create compartments
-  - build up model through identify flows, let's the model build the vector representation and differentation and derivatives
+  - build up model through identify flows, let's the model build the vector representation and differentiation and derivatives
   - use strings to identify compartments and parameters
   - transfers between compartments built up using edges defined by the labels
   - auto generation of graphs of models
@@ -53,23 +51,23 @@ a library for flexible epidemiological modelling
 - setting up compartments
 - defining flows between compartments
 - setting up parameters
-- setting up dynamic ransmissions
+- setting up dynamic transmissions
 - collecting diagnostic variables
 - saving trajectories
 
 
 # Examples
 
-- Create a simple model
-- Create a model with dynamic transmission
-- Show how to extract out vectors and derivatives
-- Scale-up function
-- Programmatically generate compartments
-- Programmtically generate diagnostic variables
-- Flow chart
-- Produce graphs with matplotlib - javascript option
+- create a simple model
+- create a model with dynamic transmission
+- show how to extract out vectors and derivatives
+- scale-up function
+- programmatically generate compartments
+- programmatically generate diagnostic variables
+- flow chart
+- produce graphs with matplotlib - javascript option
 
-## Requirements
+# Requirements
 
 - python 2.7
 - numpy
