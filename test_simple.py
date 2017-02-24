@@ -152,7 +152,7 @@ class SeirModel(BaseModel):
         self.vars["incidence"] = 0.
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
-            if 'preinfectious' in from_label and 'infectious' in to_label:
+            if "infectious" in to_label:
                 self.vars["incidence"] += val / self.vars["population"] * 1E5
 
         # calculate prevalence

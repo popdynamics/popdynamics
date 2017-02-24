@@ -42,7 +42,7 @@ def label_intersects_tags(label, tags):
     return False
 
 
-def make_sigmoidal_curve(y_low=0, y_high=1.0, x_start=0, x_inflect=0.5, multiplier=1.):
+def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
     """
     Function to make a sigmoidal curve for smooth scaling of time-variant parameter values
 
@@ -334,6 +334,7 @@ class BaseModel:
     def calculate_vars(self):
         """
         Calculate self.vars that only depend on compartment values
+        (i.e. those not pre-specified, such as force of infection)
         """
         pass
 
