@@ -92,6 +92,7 @@ def plot_compartment_sizes(model):
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
 
 
+# Define model objects based on BaseModel from basepop.py
 class SeirModel(BaseModel):
     """
     Based on the SEIR models from Vynnycky and White Chapter 3 and the corresponding on-line Excel
@@ -277,6 +278,7 @@ class TbModel(BaseModel):
                 self.vars["latent"] += self.compartments[label] / self.vars["population"] * 1E5
 
 
+# Run models
 if __name__ == "__main__":
 
     ###################
