@@ -91,7 +91,7 @@ class BaseModel():
         self.infection_death_rate_flows = []
 
         # the generalized death rate of all compartments
-        self.background_death_rate = 0.0
+        self.background_death_rate = 0.
 
         self.soln_array = None
         self.var_labels = None
@@ -189,7 +189,7 @@ class BaseModel():
         and self.vars calculated in self.calculate_vars.
         """
         for label in self.labels:
-            self.flows[label] = 0.0
+            self.flows[label] = 0.
 
         # birth flows
         for label, var_label in self.var_entry_rate_flow:
@@ -208,19 +208,18 @@ class BaseModel():
             self.flows[to_label] += val
 
         # normal death flows
-        self.vars["rate_death"] = 0.0
+        self.vars["rate_death"] = 0.
         for label in self.labels:
             val = self.compartments[label] * self.background_death_rate
             self.flows[label] -= val
             self.vars['rate_death'] += val
 
         # extra death flows
-        self.vars["rate_infection_death"] = 0.0
+        self.vars["rate_infection_death"] = 0.
         for label, rate in self.infection_death_rate_flows:
             val = self.compartments[label] * rate
             self.flows[label] -= val
             self.vars["rate_infection_death"] += val
-
 
     def prepare_vars_and_flows(self):
         """
@@ -236,7 +235,6 @@ class BaseModel():
         self.calculate_scaleup_vars()
         self.calculate_vars()
         self.calculate_flows()
-
 
     def make_derivate_fn(self):
 
@@ -257,11 +255,16 @@ class BaseModel():
         self.var_array = None
         self.flow_array = None
 
-        # check that each compartment has an entry flow
+        # check that each compartment has an entry flow or an exit flow
         labels_with_entry = [v[0] for v in self.var_entry_rate_flow]
-        labels_with_var = [v[1] for v in self.var_transfer_rate_flows]
-        labels_with_fixed = [v[1] for v in self.fixed_transfer_rate_flows]
-        labels = labels_with_entry + labels_with_var + labels_with_fixed
+        labels_with_var_out = [v[0] for v in self.var_transfer_rate_flows]
+        labels_with_var_in = [v[1] for v in self.var_transfer_rate_flows]
+        labels_with_fixed_out = [v[0] for v in self.fixed_transfer_rate_flows]
+        labels_with_fixed_in = [v[1] for v in self.fixed_transfer_rate_flows]
+
+        labels = labels_with_entry \
+                 + labels_with_var_out + labels_with_var_in + labels_with_fixed_out + labels_with_fixed_in
+
         for label in self.labels:
             msg = "Compartment '%s' doesn't have any entry or transfer flows" % label
             assert label in labels, msg
@@ -379,24 +382,23 @@ class BaseModel():
 
     def checks(self, error_margin=0.1):
         """
-        Assertion run during the simulation, should be overriden
-        for each model.
+        Assertion run during the simulation, should be over-ridden for each model.
 
         Args:
             error_margin: acceptable difference between target invariants
 
-        Returns:
-
         """
-        # # Check all compartments are positive
-        # for label in self.labels:
-        #     assert self.compartments[label] >= 0.0
+
+        # Check all compartments are positive
+        for label in self.labels:
+            assert self.compartments[label] >= 0.
+
         # Check population is conserved across compartments
-        population_change = \
-            self.vars['rate_birth'] \
-            - self.vars['rate_death'] \
-            - self.vars['rate_infection_death']
-        assert abs(sum(self.flows.values()) - population_change) < error_margin
+        # population_change = \
+        #     self.vars['rate_birth'] \
+        #     - self.vars['rate_death'] \
+        #     - self.vars['rate_infection_death']
+        # assert abs(sum(self.flows.values()) - population_change) < error_margin
 
     def make_graph(self, png):
         from graphviz import Digraph
@@ -455,13 +457,15 @@ class BaseModel():
         self.graph = Digraph(format='png')
         for label in self.labels:
             self.graph.node(label)
-        self.graph.node("infection_death")
+        if len(self.infection_death_rate_flows) > 0:
+            self.graph.node("infection_death")
         for from_label, to_label, var_label in self.var_transfer_rate_flows:
             self.graph.edge(from_label, to_label, label=var_label)
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             self.graph.edge(from_label, to_label, label=num_str(rate))
-        for label, rate in self.infection_death_rate_flows:
-            self.graph.edge(label, "infection_death", label=num_str(rate))
+        if len(self.infection_death_rate_flows) > 0:
+            for label, rate in self.infection_death_rate_flows:
+                self.graph.edge(label, "infection_death", label=num_str(rate))
         base, ext = os.path.splitext(png)
         if ext.lower() != '.png':
             base = png
