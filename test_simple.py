@@ -6,6 +6,92 @@ import glob
 import pylab
 
 
+# Some static functions to avoid code repetition
+def check_out_dir_exists(out_dir):
+    """
+    Make sure the output directory exists and create if it doesn't.
+    """
+
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+
+
+def open_out_dir():
+    """
+    Open the output dir at the end of the model run.
+    """
+
+    pngs = glob.glob(os.path.join(out_dir, '*png'))
+    operating_system = platform.system()
+    if 'Windows' in operating_system:
+        os.system("start " + " ".join(pngs))
+    elif 'Darwin' in operating_system:
+        os.system('open ' + " ".join(pngs))
+
+
+def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
+
+    curve1 = make_sigmoidal_curve(
+        y_high=y_med, y_low=y_low,
+        x_start=x_start, x_inflect=(x_med-x_start)*0.5 + x_start,
+        multiplier=4)
+
+    curve2 = make_sigmoidal_curve(
+        y_high=y_high, y_low=y_med,
+        x_start=x_med, x_inflect=(x_end-x_med)*0.5 + x_med,
+        multiplier=4)
+
+    def curve(x):
+        if x < x_start:
+            return y_low
+        if x < x_med:
+            return curve1(x)
+        if x < x_end:
+            return curve2(x)
+        return y_high
+
+    return curve
+
+
+def plot_epidemiological_indicators(model, infection, indicators, out_dir):
+    """
+    Plot epidemiological outputs recorded in the model object.
+
+    Inputs:
+        indicators: List of the strings that refer to the epidemiological indicators within the model's var attribute
+    """
+
+    pylab.clf()
+    for var_key in indicators:
+        pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, infection + '_indicators.png'))
+
+
+def plot_scaleup_functions(model, infection):
+    """
+    Plot scale-up functions (time-variant parameters) in model.
+    """
+
+    pylab.clf()
+    y_vals = [model.scaleup_fns["program_rate_detect"](t) for t in model.times]
+    pylab.plot(model.times, y_vals)
+    pylab.title(infection + " scaleup test curve")
+    pylab.savefig(os.path.join(out_dir, infection + "_scaleup.png"))
+
+
+def plot_compartment_sizes(model):
+    """
+    Plot compartment sizes over time.
+    """
+
+    pylab.clf()
+    for compartment in model.compartments:
+        pylab.plot(model.times, model.get_compartment_soln(compartment), label=compartment)
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
+
+
 class SeirModel(BaseModel):
     """
     Based on the SEIR models from Vynnycky and White Chapter 3 and the corresponding on-line Excel
@@ -73,82 +159,6 @@ class SeirModel(BaseModel):
             self.compartments["infectious"] \
             / self.vars["population"] * 1E5
 
-# Define parameter values for two infections - measles and influenza
-seir_param_dictionary = {
-    "measles":
-        {"population": 1e6,
-         "start_infectious": 1.,
-         "r0": 13.,
-         "duration_preinfectious": 8.,
-         "duration_infectious": 7.},
-    "flu":
-        {"population": 1e6,
-         "start_infectious": 1.,
-         "r0": 2.,
-         "duration_preinfectious": 2.,
-         "duration_infectious": 2.}
-}
-# Loop over infections
-for infection in ["flu", "measles"]:
-
-    # Set output directory
-    out_dir = infection + '_graphs'
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-    # Instantiate model object
-    model = SeirModel(seir_param_dictionary[infection])
-    model.make_times(0, 200, 1)
-    model.integrate_explicit()
-
-    # Create flow diagram
-    model.make_graph(os.path.join(out_dir, 'flow_diagram'))
-
-    # Create epidemiological indicator dictionary
-    pylab.clf()
-    for var_key in ['incidence', 'prevalence']:
-        pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'fraction.png'))
-
-    # Create compartment size tracking figure
-    pylab.clf()
-    for compartment in model.compartments:
-        pylab.plot(model.times, model.get_compartment_soln(compartment), label=compartment)
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'susceptible.png'))
-
-    pngs = glob.glob(os.path.join(out_dir, '*png'))
-    operating_system = platform.system()
-    if 'Windows' in operating_system:
-        os.system("start " + " ".join(pngs))
-    elif 'Darwin' in operating_system:
-        os.system('open ' + " ".join(pngs))
-
-
-def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
-
-    curve1 = make_sigmoidal_curve(
-        y_high=y_med, y_low=y_low,
-        x_start=x_start, x_inflect=(x_med-x_start)*0.5 + x_start,
-        multiplier=4)
-
-    curve2 = make_sigmoidal_curve(
-        y_high=y_high, y_low=y_med,
-        x_start=x_med, x_inflect=(x_end-x_med)*0.5 + x_med,
-        multiplier=4)
-
-    def curve(x):
-        if x < x_start:
-            return y_low
-        if x < x_med:
-            return curve1(x)
-        if x < x_end:
-            return curve2(x)
-        return y_high
-
-    return curve
-
 
 class TbModel(BaseModel):
     """
@@ -159,6 +169,7 @@ class TbModel(BaseModel):
 
         BaseModel.__init__(self)
 
+        # Set compartment sizes
         self.set_compartment("susceptible", 1e6)
         self.set_compartment("latent_early", 0.)
         self.set_compartment("latent_late", 0.)
@@ -166,9 +177,11 @@ class TbModel(BaseModel):
         self.set_compartment("treatment_infect", 0.)
         self.set_compartment("treatment_noninfect", 0.)
 
+        # Set demographic rates
         self.set_param("demo_rate_birth", 20. / 1e3)
         self.set_param("demo_rate_death", 1. / 65)
 
+        # Set disease-specific parameters
         self.set_param("tb_n_contact", 40.)
         self.set_param("tb_rate_earlyprogress", .1 / .5)
         self.set_param("tb_rate_lateprogress", .1 / 100.)
@@ -176,6 +189,7 @@ class TbModel(BaseModel):
         self.set_param("tb_rate_recover", .6 / 3.)
         self.set_param("tb_rate_death", .4 / 3.)
 
+        # Set programmatic parameters
         self.set_param("program_rate_detect", 1.)
         time_treatment = .5
         self.set_param("program_time_treatment", time_treatment)
@@ -186,127 +200,145 @@ class TbModel(BaseModel):
         self.set_param("program_rate_default_noninfect", .05 / time_treatment)
         self.set_param("program_rate_death_noninfect", .05 / time_treatment)
 
+        # Set time-variant programmatic parameter (for case detection rate)
         curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
         curve2 = make_sigmoidal_curve(y_high=4, y_low=2, x_start=1995, x_inflect=2003, multiplier=3)
         test_curve = lambda x: curve1(x) if x < 1990 else curve2(x)
         self.set_scaleup_fn("program_rate_detect", test_curve)
 
     def calculate_vars(self):
+
+        # Demographic variables
         self.vars["population"] = sum(self.compartments.values())
         self.vars["rate_birth"] = \
             self.params["demo_rate_birth"] * self.vars["population"]
 
-        self.vars["infectious_population"] = 0.0
+        # Infectious population for force of infection calculations
+        self.vars["infectious_population"] = 0.
         for label in self.labels:
             if 'active' in label or '_infect' in label:
                 self.vars["infectious_population"] += \
                     self.compartments[label]
 
+        # Force of infection for direct use as a flow rate
         self.vars["rate_force"] = \
             self.params["tb_n_contact"] \
             * self.vars["infectious_population"] \
             / self.vars["population"]
 
     def set_flows(self):
+
+        # Demographic
         self.set_var_entry_rate_flow("susceptible", "rate_birth")
-
-        self.set_var_transfer_rate_flow(
-            "susceptible", "latent_early", "rate_force")
-
-        self.set_fixed_transfer_rate_flow(
-            "latent_early", "active", "tb_rate_earlyprogress")
-        self.set_fixed_transfer_rate_flow(
-            "latent_early", "latent_late", "tb_rate_stabilise")
-        self.set_fixed_transfer_rate_flow(
-            "latent_late", "active", "tb_rate_lateprogress")
-        self.set_fixed_transfer_rate_flow(
-            "active", "latent_late", "tb_rate_recover")
-
-        self.set_var_transfer_rate_flow(
-            "active", "treatment_infect", "program_rate_detect")
-
-        self.set_fixed_transfer_rate_flow(
-            "treatment_infect", "treatment_noninfect", "program_rate_completion_infect")
-        self.set_fixed_transfer_rate_flow(
-            "treatment_infect", "active", "program_rate_default_infect")
-        self.set_fixed_transfer_rate_flow(
-            "treatment_noninfect", "susceptible", "program_rate_completion_noninfect")
-        self.set_fixed_transfer_rate_flow(
-            "treatment_noninfect", "active", "program_rate_default_noninfect")
-
         self.set_background_death_rate("demo_rate_death")
-        self.set_infection_death_rate_flow(
-            "active", "tb_rate_death")
-        self.set_infection_death_rate_flow(
-            "treatment_infect", "program_rate_death_infect")
-        self.set_infection_death_rate_flow(
-            "treatment_noninfect", "program_rate_death_noninfect")
+
+        # Infection
+        self.set_var_transfer_rate_flow("susceptible", "latent_early", "rate_force")
+
+        # Disease progression
+        self.set_fixed_transfer_rate_flow("latent_early", "active", "tb_rate_earlyprogress")
+        self.set_fixed_transfer_rate_flow("latent_early", "latent_late", "tb_rate_stabilise")
+        self.set_fixed_transfer_rate_flow("latent_late", "active", "tb_rate_lateprogress")
+        self.set_fixed_transfer_rate_flow("active", "latent_late", "tb_rate_recover")
+        self.set_infection_death_rate_flow("active", "tb_rate_death")
+        self.set_infection_death_rate_flow("treatment_infect", "program_rate_death_infect")
+        self.set_infection_death_rate_flow("treatment_noninfect", "program_rate_death_noninfect")
+
+        # Programmatically variable rate(s)
+        self.set_var_transfer_rate_flow("active", "treatment_infect", "program_rate_detect")
+
+        # Progression through treatment
+        self.set_fixed_transfer_rate_flow("treatment_infect", "treatment_noninfect", "program_rate_completion_infect")
+        self.set_fixed_transfer_rate_flow("treatment_infect", "active", "program_rate_default_infect")
+        self.set_fixed_transfer_rate_flow("treatment_noninfect", "susceptible", "program_rate_completion_noninfect")
+        self.set_fixed_transfer_rate_flow("treatment_noninfect", "active", "program_rate_default_noninfect")
 
     def calculate_diagnostic_vars(self):
 
+        # Progressively sum incidence
         rate_incidence = 0.
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
             if 'latent' in from_label and 'active' in to_label:
                 rate_incidence += val
 
-        # Main epidemiological indicators - note that denominator is not individuals
-        self.vars["prevalence"] = \
-            self.vars["infectious_population"] \
-            / self.vars["population"] * 1E5
+        # Calculate main epidemiological indicators
+        self.vars["prevalence"] \
+            = self.vars["infectious_population"] / self.vars["population"] * 1E5
+        self.vars["incidence"] \
+            = rate_incidence / self.vars["population"] * 1E5
+        self.vars["mortality"] \
+            = self.vars["rate_infection_death"] / self.vars["population"] * 1E5
 
-        self.vars["incidence"] = \
-            rate_incidence \
-            / self.vars["population"] * 1E5
-
-        self.vars["mortality"] = \
-            self.vars["rate_infection_death"] \
-            / self.vars["population"] * 1E5
-
-        self.vars["latent"] = 0.0
+        # Calculate proportion of population latently infected (including early and late)
+        self.vars["latent"] = 0.
         for label in self.labels:
             if "latent" in label:
-                self.vars["latent"] += (
-                    self.compartments[label]
-                    / self.vars["population"] * 1E5)
-
-out_dir = 'tb_graphs'
-if not os.path.isdir(out_dir):
-    os.makedirs(out_dir)
-
-model = TbModel()
-model.make_times(1900, 2050, 0.05)
-model.integrate_explicit()
-
-model.make_graph(os.path.join(out_dir, 'flow_diagram'))
-
-pylab.clf()
-y_vals = [model.scaleup_fns["program_rate_detect"](t) for t in model.times]
-pylab.plot(model.times, y_vals)
-pylab.title('scaleup test curve')
-pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
-
-pylab.clf()
-for var_key in ['mortality', 'incidence', 'prevalence']:
-    pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
-pylab.legend()
-pylab.savefig(os.path.join(out_dir, 'fraction.png'))
-
-pngs = glob.glob(os.path.join(out_dir, '*png'))
-operating_system = platform.system()
-if 'Windows' in operating_system:
-    os.system("start " + " ".join(pngs))
-elif 'Darwin' in operating_system:
-    os.system('open ' + " ".join(pngs))
+                self.vars["latent"] += self.compartments[label] / self.vars["population"] * 1E5
 
 
+if __name__ == "__main__":
 
+    ###################
+    ### SEIR models ###
+    ###################
 
+    # Define parameter values for two SEIR infections - measles and influenza
+    seir_param_dictionary = {
+        "measles":
+            {"population": 1e6,
+             "start_infectious": 1.,
+             "r0": 13.,
+             "duration_preinfectious": 8.,
+             "duration_infectious": 7.},
+        "flu":
+            {"population": 1e6,
+             "start_infectious": 1.,
+             "r0": 2.,
+             "duration_preinfectious": 2.,
+             "duration_infectious": 2.}
+    }
 
+    # Loop over SEIR infections
+    for infection in ["flu", "measles"]:
 
+        # Set output directory
+        out_dir = infection + '_graphs'
+        check_out_dir_exists(out_dir)
 
+        # Instantiate model object
+        model = SeirModel(seir_param_dictionary[infection])
+        model.make_times(0, 200, 1)
+        model.integrate_explicit()
 
+        # Plot results
+        model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
+        plot_epidemiological_indicators(model, infection, ["incidence", "prevalence"], out_dir)
+        plot_compartment_sizes(model)
 
+        # Open output directory
+        open_out_dir()
+
+    #################
+    ### TB models ###
+    #################
+
+    # Make directory for TB outputs
+    out_dir = "tb_graphs"
+    check_out_dir_exists(out_dir)
+
+    # Create and run TB model
+    model = TbModel()
+    model.make_times(1900, 2050, 0.05)
+    model.integrate_explicit()
+
+    # Plot results
+    model.make_graph(os.path.join(out_dir, "tb_flow_diagram"))
+    plot_epidemiological_indicators(model, "tb", ["incidence", "prevalence", "mortality"], out_dir)
+    plot_scaleup_functions(model, "tb")
+
+    # Open output directory
+    open_out_dir()
 
 
 
