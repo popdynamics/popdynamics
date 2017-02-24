@@ -2,11 +2,7 @@
 
 
 """
-
-Base Population Model to handle different type of models.
-
-Implicit time unit: years
-
+Base Population Model to handle different type of models
 """
 
 import os
@@ -17,10 +13,10 @@ from math import exp
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """
-    Adds or modifies a list of tuples, compares only the items
-    before the last in the tuples, the last value in the tuple
-    is assumed to be a value.
+    Adds or modifies a list of tuples, compares only the items before the last in the tuples,
+    the last value in the tuple is assumed to be a value.
     """
+
     for i, test_tuple in enumerate(a_list):
         if test_tuple[:-1] == a_tuple[:-1]:
             a_list[i] = a_tuple
@@ -30,76 +26,142 @@ def add_unique_tuple_to_list(a_list, a_tuple):
 
 
 def label_intersects_tags(label, tags):
+    """
+    Determine whether a string is contained within a list of strings for use in functions such as calculation of the
+    force of infection, where we might want a list of all the compartments that contain a particular string
+    (such as "active" or "infectious").
+
+    Args:
+        label: The string we're searching for
+        tags: List for comparison
+    """
+
     for tag in tags:
         if tag in label:
             return True
     return False
 
 
-class BaseModel():
+def make_sigmoidal_curve(y_low=0, y_high=1.0, x_start=0, x_inflect=0.5, multiplier=1.):
     """
-    Basic concept
-      - var - values that are calculated at every time step
-      - param - values that are set at the beginning 
+    Function to make a sigmoidal curve for smooth scaling of time-variant parameter values
 
+    Args:
+        y_low: lowest y value
+        y_high: highest y value
+        x_inflect: inflection point of graph along the x-axis
+        multiplier: if 1, slope at x_inflect goes to (0, y_low), larger
+                    values makes it steeper
+
+    Returns:
+        function that increases sigmoidally from 0 y_low to y_high
+        the halfway point is at x_inflect on the x-axis and the slope
+        at x_inflect goes to (0, y_low) if the multiplier is 1.
     """
+
+    amplitude = y_high - y_low
+    if amplitude == 0:
+        def curve(x):
+            return y_low
+
+        return curve
+
+    x_delta = x_inflect - x_start
+    slope_at_inflection = multiplier * 0.5 * amplitude / x_delta
+    b = 4. * slope_at_inflection / amplitude
+
+    def curve(x):
+        arg = b * (x_inflect - x)
+        # check for large values that will blow out exp
+        if arg > 10.:
+            return y_low
+        return amplitude / (1. + exp(arg)) + y_low
+
+    return curve
+
+
+class BaseModel:
+    """
+    Basic concepts
+      var - values that are calculated at every time step
+      param - values that remain fixed throughout the model run
+    """
+
     def __init__(self):
 
-        # labels for all compartments
+        # list of labels for all compartments
         self.labels = []
 
         # stores the initial value for all compartments
         self.init_compartments = {}
 
-        # stores the values of all parameters, there 
-        # should be no hard-coded values except as contained
-        # in this structure
+        # stores the values of all parameters
+        # there should be no hard-coded values except as contained in this structure
         self.params = {}
 
-        # stores list of time points
+        # stored list of time points
         self.times = None
 
+        # scale-up functions, generally used for time-variant parameters,
+        # whose values change in a way that is predictable before the model has been run
         self.scaleup_fns = {}
 
-        # stores any auxillary variables used to calculate
-        # dynamic transmission at every time-step
+        # stores any auxillary variables used to calculate dynamic effects (such as transmission) at each time-step
         self.vars = {}
 
         # total flow of each compartment
         self.flows = {}
 
+        # variable entry (birth) rate flow(s)
         # list of 2-tuple (label, var_label)
         #   - label: name of compartment
         #   - var_label: name of var that holds the entry rate
         self.var_entry_rate_flow = []
 
+        # fixed transfer rates (often for progression between infected states after infection has occurred)
         # list of 3-tuple (from_label, to_label, param_label)
         #   - from_label: name of compartment that loses population
         #   - to_label: name of compartment that gains population
         #   - param_label: name of param that holds the rate
         self.fixed_transfer_rate_flows = []
 
+        # variable transfer rates (can be used either for flows that vary due to predictable effects
+        # - scale-up functions - or for flows that vary due to the dynamics of the infection - force of infection)
         # list of 3-tuple (from_label, to_label, var_label)
         #   - from_label: name of compartment that loses population
         #   - to_label: name of compartment that gains population
         #   - var_label: name of var that holds the rate
         self.var_transfer_rate_flows = []
 
+        # fixed infection death rate flows (Should only be applied to persons with active disease as a consequence of
+        # the infection, while latent or preinfectious individuals should be assumed to take the population-wide
+        # death rates only. Also note that for actively diseased persons, this rate is added to the population rate.)
         # list of 2-tuple (label, rate)
         #   - label: name of compartment
         #   - rate: disease specific death rate
         self.infection_death_rate_flows = []
 
-        # the generalized death rate of all compartments
+        # the generalised death rate of all compartments
         self.background_death_rate = 0.
 
+        # other universally required model attributes
         self.soln_array = None
         self.var_labels = None
         self.var_array = None
         self.flow_array = None
 
     def make_times(self, start, end, delta):
-        "Return steps with n or delta"
+        """
+        Make a list of times for integration to be performed at. Units are arbitrary.
+
+        Args:
+            start: Numerical time to start at (can be a calendar year, or zero for epidemic time, or other)
+            end: Numerical end time
+            delta: Interval between times
+        Creates:
+            self.times: List of numerical times for integration to be assessed at
+        """
+
         self.times = []
         step = start
         while step <= end:
@@ -107,7 +169,16 @@ class BaseModel():
             step += delta
 
     def make_times_with_n_step(self, start, end, n):
-        "Return steps with n or delta"
+        """
+        Alternative to make_times. For this one, the third argument is the number of time points required, rather than
+        the step between time points.
+
+        Args:
+            start: As for make_times
+            end: As for make_times
+            n: Number of time points that are needed
+        """
+
         self.times = []
         step = start
         delta = (end - start) / float(n)
@@ -115,26 +186,66 @@ class BaseModel():
             self.times.append(step)
             step += delta
 
-    def set_compartment(self, label, init_val=0.0):
+    def set_compartment(self, label, init_val=0.):
+        """
+        Create a population compartment for the model.
+
+        Args:
+            label: String to describe the compartment
+            init_val: Starting value for that compartment (default behaviour is to start from empty compartment)
+        """
+
         if label not in self.labels:
             self.labels.append(label)
         self.init_compartments[label] = init_val
-        assert init_val >= 0, 'Start with negative compartment not permitted'
+        assert init_val >= 0., 'Start with negative compartment not permitted'
 
     def set_param(self, label, val):
+        """
+        Add a parameter value to the dictionary of parameter values
+
+        Args:
+            label: String name of the compartment
+            val: Value (generally float) for the parameter
+        """
+
         self.params[label] = val
 
     def convert_list_to_compartments(self, vec):
+        """
+        Distribute the list of compartment values to create a dictionary (reverse of convert_compartments_to_list).
+
+        Args:
+            vec: List of compartment values ordered according to the labels list
+        Returns:
+            Dictionary with keys from labels attribute and values from vec
+        """
+
         return {l: vec[i] for i, l in enumerate(self.labels)}
 
     def convert_compartments_to_list(self, compartments):
+        """
+        Distribute compartments dictionary to a list for making derivative function.
+
+        Args:
+            compartments: Dictionary of compartments
+        Returns:
+            List of compartment values with equivalent ordering to labels
+        """
+
         return [compartments[l] for l in self.labels]
 
     def get_init_list(self):
+        """
+        Convert starting compartment size dictionary to list for integration.
+
+        Returns:
+            List of values for starting compartments
+        """
+
         return self.convert_compartments_to_list(self.init_compartments)
 
     def set_scaleup_fn(self, label, fn):
-
         """
         Simple method to add a scale-up function to the dictionary of scale-ups.
 
@@ -145,33 +256,76 @@ class BaseModel():
 
         self.scaleup_fns[label] = fn
 
-    def set_background_death_rate(self, param_label):
+    def set_population_death_rate(self, param_label="demo_rate_death"):
+        """
+        Sets the population death rate to be applied to all compartments.
+
+        Args:
+            param_label: String for the population death rate
+        """
+
         self.background_death_rate = self.params[param_label]
 
     def set_infection_death_rate_flow(self, label, param_label):
-        add_unique_tuple_to_list(
-            self.infection_death_rate_flows,
-            (label, self.params[param_label]))
+        """
+        Set an additional death rate for those with active infection.
+
+        Args:
+            label: Compartment to apply the additional death rate to
+            param_label: String of the parameter to be used for setting the death rate
+        """
+
+        add_unique_tuple_to_list(self.infection_death_rate_flows,
+                                 (label, self.params[param_label]))
 
     def set_fixed_transfer_rate_flow(self, from_label, to_label, param_label):
+        """
+        Set constant inter-compartmental flow, such as those related to progression through infection states after
+        infection.
+
+        Args:
+            from_label: Compartment that this flow comes from
+            to_label: Compartment that this flow goes into
+            param_label: String of the parameter to be used for setting this transition rate
+        """
+
         add_unique_tuple_to_list(
             self.fixed_transfer_rate_flows,
             (from_label, to_label, self.params[param_label]))
 
     def set_var_transfer_rate_flow(self, from_label, to_label, var_label):
+        """
+        Set variable inter-compartmental flow - as can be used for setting predictable time-variant inter-compartmental
+        flows (such as scale-up functions) or for those that have to be calculated from the model (such as the force
+        of infection).
+
+        Args:
+            from_label: Compartment that this flow comes from
+            to_label: Compartment that this flow goes into
+            param_label: String of the parameter to be used for setting this transition rate
+        """
+
         add_unique_tuple_to_list(
             self.var_transfer_rate_flows,
             (from_label, to_label, var_label))
 
     def set_var_entry_rate_flow(self, label, var_label):
+        """
+        Set variable entry rate to model, to be used for new births into the population (and migration if required).
+
+        Args:
+            label: Compartment that this flow goes in to
+            var_label: String of the var to be used for setting this entry rate
+        """
+
         add_unique_tuple_to_list(
             self.var_entry_rate_flow,
             (label, var_label))
 
     def calculate_scaleup_vars(self):
-
         """
-        Find the values of the scale-up functions at a specific point in time. Called within the integration process.
+        Find the values of the scale-up functions at a specific point in time
+        (to be called within the integration process).
         """
 
         for label, fn in self.scaleup_fns.iteritems(): 
@@ -185,9 +339,11 @@ class BaseModel():
 
     def calculate_flows(self):
         """
-        Calculate flows, which should only depend on compartment values
-        and self.vars calculated in self.calculate_vars.
+        Main method to calculate changes in all compartment sizes based on flow rate,
+        which should only depend on compartment values and self.vars already calculated in self.calculate_vars.
         """
+
+        # start from zero for all compartments
         for label in self.labels:
             self.flows[label] = 0.
 
@@ -212,7 +368,7 @@ class BaseModel():
         for label in self.labels:
             val = self.compartments[label] * self.background_death_rate
             self.flows[label] -= val
-            self.vars['rate_death'] += val
+            self.vars["rate_death"] += val
 
         # extra death flows
         self.vars["rate_infection_death"] = 0.
@@ -223,20 +379,21 @@ class BaseModel():
 
     def prepare_vars_and_flows(self):
         """
-        This function collects some other functions that previously 
-        led to a bug because not all of them were called
-        in the diagnostics round.
+        Calculate all scale-up function, vars and flows during integration
         """
 
-        # Clear previously populated vars dictionary
+        # clear previously populated vars dictionary
         self.vars.clear()
 
-        # Calculate vars and flows sequentially
+        # calculate vars and flows sequentially
         self.calculate_scaleup_vars()
         self.calculate_vars()
         self.calculate_flows()
 
     def make_derivate_fn(self):
+        """
+        Create the derivative function for integration
+        """
 
         def derivative_fn(y, t):
             self.time = t
@@ -249,38 +406,54 @@ class BaseModel():
         return derivative_fn
 
     def init_run(self):
+        """
+        Starting method to integration processes
+        """
+
         self.set_flows()
         self.var_labels = None
         self.soln_array = None
         self.var_array = None
         self.flow_array = None
 
-        # check that each compartment has an entry flow or an exit flow
+        # check that each compartment has at least one entry flow or exit flow
+        # (i.e. that all compartments are connected to the model)
         labels_with_entry = [v[0] for v in self.var_entry_rate_flow]
         labels_with_var_out = [v[0] for v in self.var_transfer_rate_flows]
         labels_with_var_in = [v[1] for v in self.var_transfer_rate_flows]
         labels_with_fixed_out = [v[0] for v in self.fixed_transfer_rate_flows]
         labels_with_fixed_in = [v[1] for v in self.fixed_transfer_rate_flows]
 
-        labels = labels_with_entry \
-                 + labels_with_var_out + labels_with_var_in + labels_with_fixed_out + labels_with_fixed_in
+        connected_compartments \
+            = labels_with_entry + labels_with_var_out + labels_with_var_in \
+              + labels_with_fixed_out + labels_with_fixed_in
 
         for label in self.labels:
             msg = "Compartment '%s' doesn't have any entry or transfer flows" % label
-            assert label in labels, msg
+            assert label in connected_compartments, msg
 
     def integrate_scipy(self):
+        """
+        Use the scipy integration package's odeint function to run integration
+        """
+
         self.init_run()
-        assert not self.times is None, "Haven't set times yet"
+        assert self.times is not None, "Haven't set times yet"
         init_y = self.get_init_list()
         derivative = self.make_derivate_fn()
         self.soln_array = odeint(derivative, init_y, self.times)
-
         self.calculate_diagnostics()
 
     def integrate_explicit(self, min_dt=0.05):
+        """
+        Integrate with Euler explicit method
+
+        Args:
+            min_dt:  Minimum time change allowed
+        """
+
         self.init_run()
-        assert not self.times is None, "Haven't set times yet"
+        assert self.times is not None, "Haven't set times yet"
         y = self.get_init_list()
         n_component = len(y)
         n_time = len(self.times)
@@ -301,8 +474,8 @@ class BaseModel():
                 for i in range(n_component):
                     y[i] = y[i] + dt * f[i]
                     # hack to avoid errors due to time-step
-                    if y[i] < 0.0:
-                        y[i] = 0.0
+                    if y[i] < 0.:
+                        y[i] = 0.
             if i_time < n_time - 1:
                 self.soln_array[i_time + 1, :] = y
 
@@ -310,12 +483,17 @@ class BaseModel():
 
     def calculate_diagnostic_vars(self):
         """
-        Calculate diagnostic vars that can depend on self.flows as
-        well as self.vars calculated in calculate_vars
+        Calculate diagnostic vars that can depend on self.flows as well as self.vars calculated in calculate_vars
         """
+
         pass
 
     def calculate_diagnostics(self):
+        """
+        Run diagnostic functions to get outcomes at end of integration
+        """
+
+        # create dictionary of lists of compartment values
         self.population_soln = {}
         for label in self.labels:
             if label in self.population_soln:
@@ -334,9 +512,8 @@ class BaseModel():
             self.calculate_flows()
             self.calculate_diagnostic_vars()
 
-            # only set after self.calculate_diagnostic_vars is
-            # run so that we have all var_labels, including
-            # the ones in calculate_diagnostic_vars
+            # only set after self.calculate_diagnostic_vars has been run so that we have all var_labels,
+            # including the ones in calculate_diagnostic_vars
             if self.var_labels is None:
                 self.var_labels = self.vars.keys()
                 self.var_array = numpy.zeros((n_time, len(self.var_labels)))
@@ -347,6 +524,7 @@ class BaseModel():
             for i_label, label in enumerate(self.labels):
                 self.flow_array[i, i_label] = self.flows[label]
 
+        # calculate compartment sizes as fractions of population
         self.fraction_soln = {}
         for label in self.labels:
             self.fraction_soln[label] = [
@@ -359,21 +537,56 @@ class BaseModel():
             ]
 
     def get_compartment_soln(self, label):
+        """
+        Find the values of a named compartment over the time steps of the integration
+
+        Args:
+            label: String for the name of the compartment of interest
+        Returns:
+            List of values for this compartment's values over time
+        """
+
         assert self.soln_array is not None, "calculate_diagnostics has not been run"
         i_label = self.labels.index(label)
         return self.soln_array[:, i_label]
 
     def get_var_soln(self, label):
+        """
+        Find the values of a var over the time steps of the integration
+
+        Args:
+            label: String for the name of the var of interest
+        Returns:
+            List of values for this var's values over time
+        """
+
         assert self.var_array is not None, "calculate_diagnostics has not been run"
         i_label = self.var_labels.index(label)
         return self.var_array[:, i_label]
 
     def get_flow_soln(self, label):
+        """
+        Find the values of a compartment's flows over the time steps of the integration
+
+        Args:
+            label: String for the name of the compartment of interest
+        Returns:
+            List of values for this compartment's flows over time
+        """
+
         assert self.flow_array is not None, "calculate_diagnostics has not been run"
         i_label = self.labels.index(label)
         return self.flow_array[:, i_label]
 
     def load_state(self, i_time):
+        """
+        Reload the compartmental state of a model from a previous time point
+        (for running alternative scenarios if epidemiological changes have been made from a point in time)
+
+        Args:
+            i_time: The index of the list of times to load from
+        """
+
         self.time = self.times[i_time]
         for i_label, label in enumerate(self.labels):
             self.compartments[label] = \
@@ -382,11 +595,10 @@ class BaseModel():
 
     def checks(self, error_margin=0.1):
         """
-        Assertion run during the simulation, should be over-ridden for each model.
+        Assertions run during the simulation, should be over-ridden for each model, but given as an example
 
         Args:
             error_margin: acceptable difference between target invariants
-
         """
 
         # Check all compartments are positive
@@ -401,6 +613,13 @@ class BaseModel():
         # assert abs(sum(self.flows.values()) - population_change) < error_margin
 
     def make_graph(self, png):
+        """
+        Use external module (graphviz) to create a flow diagram of the compartmental structure of the model
+
+        Args:
+            png: String for the filename of the file for the diagram to be stored in
+        """
+
         from graphviz import Digraph
 
         styles = {
@@ -474,9 +693,18 @@ class BaseModel():
 
         self.graph.render(base)
 
-    def check_converged_compartment_fraction(
-            self, label, equil_time, test_fraction_diff):
-        labels = self.labels
+    def check_converged_compartment_fraction(self, label, equil_time, test_fraction_diff):
+        """
+        Numerically determine whether a compartment's proportion has converged to reach an approximate equilibrium
+
+        Args:
+            label: Compartment to check
+            equil_time: Point in time to check at
+            test_fraction_diff: Difference in compartment value below which convergence can be considered
+        Returns:
+            Boolean for whether convergence has occurred
+        """
+
         self.calculate_diagnostics()
         times = self.times
         fraction = self.fraction_soln[label]
@@ -495,37 +723,3 @@ class BaseModel():
                 return False
         return True
 
-
-def make_sigmoidal_curve(y_low=0, y_high=1.0, x_start=0, x_inflect=0.5, multiplier=1.):
-    """
-    Args:
-        y_low: lowest y value
-        y_high: highest y value
-        x_inflect: inflection point of graph along the x-axis
-        multiplier: if 1, slope at x_inflect goes to (0, y_low), larger
-                    values makes it steeper
-
-    Returns:
-        function that increases sigmoidally from 0 y_low to y_high
-        the halfway point is at x_inflect on the x-axis and the slope
-        at x_inflect goes to (0, y_low) if the multiplier is 1.
-    """
-
-    amplitude = y_high - y_low
-    if amplitude == 0:
-        def curve(x):
-            return y_low
-        return curve
-
-    x_delta = x_inflect - x_start
-    slope_at_inflection = multiplier * 0.5 * amplitude / x_delta
-    b = 4. * slope_at_inflection / amplitude
-
-    def curve(x):
-        arg = b * ( x_inflect - x )
-        # check for large values that will blow out exp
-        if arg > 10.0:
-            return y_low
-        return amplitude / ( 1. + exp( arg ) ) + y_low
-
-    return curve

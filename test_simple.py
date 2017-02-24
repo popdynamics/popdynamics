@@ -92,7 +92,7 @@ def plot_compartment_sizes(model):
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
 
 
-# Define model objects based on BaseModel from basepop.py
+# define model objects based on BaseModel from basepop.py
 class SeirModel(BaseModel):
     """
     Based on the SEIR models from Vynnycky and White Chapter 3 and the corresponding on-line Excel
@@ -115,14 +115,14 @@ class SeirModel(BaseModel):
 
         BaseModel.__init__(self)
 
-        # Set starting compartment values
+        # set starting compartment values
         self.set_compartment("susceptible",
                              seir_param_dictionary["population"] - seir_param_dictionary["start_infectious"])
         self.set_compartment("preinfectious", 0.)
         self.set_compartment("infectious", seir_param_dictionary["start_infectious"])
         self.set_compartment("immune", 0.)
 
-        # Set model parameters
+        # set model parameters
         self.set_param("infection_beta",
                        seir_param_dictionary["r0"]
                        / (seir_param_dictionary["duration_infectious"] * seir_param_dictionary["population"]))
@@ -131,31 +131,31 @@ class SeirModel(BaseModel):
 
     def calculate_vars(self):
 
-        # Track total population size
+        # track total population size
         self.vars["population"] = sum(self.compartments.values())
 
-        # Calculate force of infection from beta (which was derived from R0 above)
+        # calculate force of infection from beta (which was derived from R0 above)
         self.vars["rate_force"] = self.params["infection_beta"] * self.compartments["infectious"]
 
     def set_flows(self):
 
-        # Set variable infection transition flow
+        # set variable infection transition flow
         self.set_var_transfer_rate_flow("susceptible", "preinfectious", "rate_force")
 
-        # Set fixed inter-compartmental flows
+        # set fixed inter-compartmental flows
         self.set_fixed_transfer_rate_flow("preinfectious", "infectious", "infection_rate_progress")
         self.set_fixed_transfer_rate_flow("infectious", "immune", "infection_rate_recover")
 
     def calculate_diagnostic_vars(self):
 
-        # Calculate incidence
+        # calculate incidence
         self.vars["incidence"] = 0.
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
             if 'preinfectious' in from_label and 'infectious' in to_label:
                 self.vars["incidence"] += val / self.vars["population"] * 1E5
 
-        # Calculate prevalence
+        # calculate prevalence
         self.vars["prevalence"] = \
             self.compartments["infectious"] \
             / self.vars["population"] * 1E5
@@ -170,7 +170,7 @@ class TbModel(BaseModel):
 
         BaseModel.__init__(self)
 
-        # Set compartment sizes
+        # set compartment sizes
         self.set_compartment("susceptible", 1e6)
         self.set_compartment("latent_early", 0.)
         self.set_compartment("latent_late", 0.)
@@ -178,11 +178,11 @@ class TbModel(BaseModel):
         self.set_compartment("treatment_infect", 0.)
         self.set_compartment("treatment_noninfect", 0.)
 
-        # Set demographic rates
+        # set demographic rates
         self.set_param("demo_rate_birth", 20. / 1e3)
         self.set_param("demo_rate_death", 1. / 65)
 
-        # Set disease-specific parameters
+        # set disease-specific parameters
         self.set_param("tb_n_contact", 40.)
         self.set_param("tb_rate_earlyprogress", .1 / .5)
         self.set_param("tb_rate_lateprogress", .1 / 100.)
@@ -190,7 +190,7 @@ class TbModel(BaseModel):
         self.set_param("tb_rate_recover", .6 / 3.)
         self.set_param("tb_rate_death", .4 / 3.)
 
-        # Set programmatic parameters
+        # set programmatic parameters
         self.set_param("program_rate_detect", 1.)
         time_treatment = .5
         self.set_param("program_time_treatment", time_treatment)
@@ -201,7 +201,7 @@ class TbModel(BaseModel):
         self.set_param("program_rate_default_noninfect", .05 / time_treatment)
         self.set_param("program_rate_death_noninfect", .05 / time_treatment)
 
-        # Set time-variant programmatic parameter (for case detection rate)
+        # set time-variant programmatic parameter (for case detection rate)
         curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
         curve2 = make_sigmoidal_curve(y_high=4, y_low=2, x_start=1995, x_inflect=2003, multiplier=3)
         test_curve = lambda x: curve1(x) if x < 1990 else curve2(x)
@@ -209,19 +209,19 @@ class TbModel(BaseModel):
 
     def calculate_vars(self):
 
-        # Demographic variables
+        # demographic variables
         self.vars["population"] = sum(self.compartments.values())
         self.vars["rate_birth"] = \
             self.params["demo_rate_birth"] * self.vars["population"]
 
-        # Infectious population for force of infection calculations
+        # infectious population for force of infection calculations
         self.vars["infectious_population"] = 0.
         for label in self.labels:
             if 'active' in label or '_infect' in label:
                 self.vars["infectious_population"] += \
                     self.compartments[label]
 
-        # Force of infection for direct use as a flow rate
+        # force of infection for direct use as a flow rate
         self.vars["rate_force"] = \
             self.params["tb_n_contact"] \
             * self.vars["infectious_population"] \
@@ -229,14 +229,14 @@ class TbModel(BaseModel):
 
     def set_flows(self):
 
-        # Demographic
+        # demographic
         self.set_var_entry_rate_flow("susceptible", "rate_birth")
-        self.set_background_death_rate("demo_rate_death")
+        self.set_population_death_rate()
 
-        # Infection
+        # infection
         self.set_var_transfer_rate_flow("susceptible", "latent_early", "rate_force")
 
-        # Disease progression
+        # disease progression
         self.set_fixed_transfer_rate_flow("latent_early", "active", "tb_rate_earlyprogress")
         self.set_fixed_transfer_rate_flow("latent_early", "latent_late", "tb_rate_stabilise")
         self.set_fixed_transfer_rate_flow("latent_late", "active", "tb_rate_lateprogress")
@@ -245,10 +245,10 @@ class TbModel(BaseModel):
         self.set_infection_death_rate_flow("treatment_infect", "program_rate_death_infect")
         self.set_infection_death_rate_flow("treatment_noninfect", "program_rate_death_noninfect")
 
-        # Programmatically variable rate(s)
+        # programmatically variable rate(s)
         self.set_var_transfer_rate_flow("active", "treatment_infect", "program_rate_detect")
 
-        # Progression through treatment
+        # progression through treatment
         self.set_fixed_transfer_rate_flow("treatment_infect", "treatment_noninfect", "program_rate_completion_infect")
         self.set_fixed_transfer_rate_flow("treatment_infect", "active", "program_rate_default_infect")
         self.set_fixed_transfer_rate_flow("treatment_noninfect", "susceptible", "program_rate_completion_noninfect")
@@ -256,14 +256,14 @@ class TbModel(BaseModel):
 
     def calculate_diagnostic_vars(self):
 
-        # Progressively sum incidence
+        # progressively sum incidence
         rate_incidence = 0.
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
             if 'latent' in from_label and 'active' in to_label:
                 rate_incidence += val
 
-        # Calculate main epidemiological indicators
+        # calculate main epidemiological indicators
         self.vars["prevalence"] \
             = self.vars["infectious_population"] / self.vars["population"] * 1E5
         self.vars["incidence"] \
@@ -271,21 +271,21 @@ class TbModel(BaseModel):
         self.vars["mortality"] \
             = self.vars["rate_infection_death"] / self.vars["population"] * 1E5
 
-        # Calculate proportion of population latently infected (including early and late)
+        # calculate proportion of population latently infected (including early and late)
         self.vars["latent"] = 0.
         for label in self.labels:
             if "latent" in label:
                 self.vars["latent"] += self.compartments[label] / self.vars["population"] * 1E5
 
 
-# Run models
+# run models
 if __name__ == "__main__":
 
     ###################
     ### SEIR models ###
     ###################
 
-    # Define parameter values for two SEIR infections - measles and influenza
+    # define parameter values for two SEIR infections - measles and influenza
     seir_param_dictionary = {
         "measles":
             {"population": 1e6,
@@ -301,45 +301,45 @@ if __name__ == "__main__":
              "duration_infectious": 2.}
     }
 
-    # Loop over SEIR infections
+    # loop over SEIR infections
     for infection in ["flu", "measles"]:
 
-        # Set output directory
+        # set output directory
         out_dir = infection + '_graphs'
         check_out_dir_exists(out_dir)
 
-        # Instantiate model object
+        # instantiate model object
         model = SeirModel(seir_param_dictionary[infection])
         model.make_times(0, 200, 1)
         model.integrate_explicit()
 
-        # Plot results
+        # plot results
         model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
         plot_epidemiological_indicators(model, infection, ["incidence", "prevalence"], out_dir)
         plot_compartment_sizes(model)
 
-        # Open output directory
+        # open output directory
         open_out_dir()
 
     #################
     ### TB models ###
     #################
 
-    # Make directory for TB outputs
+    # make directory for TB outputs
     out_dir = "tb_graphs"
     check_out_dir_exists(out_dir)
 
-    # Create and run TB model
+    # create and run TB model
     model = TbModel()
     model.make_times(1900, 2050, 0.05)
     model.integrate_explicit()
 
-    # Plot results
+    # plot results
     model.make_graph(os.path.join(out_dir, "tb_flow_diagram"))
     plot_epidemiological_indicators(model, "tb", ["incidence", "prevalence", "mortality"], out_dir)
     plot_scaleup_functions(model, "tb")
 
-    # Open output directory
+    # open output directory
     open_out_dir()
 
 
