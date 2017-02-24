@@ -311,7 +311,7 @@ if __name__ == "__main__":
         # instantiate model object
         model = SeirModel(seir_param_dictionary[infection])
         model.make_times(0, 200, 1)
-        model.integrate_explicit()
+        model.integrate("explicit")
 
         # plot results
         model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
@@ -332,7 +332,7 @@ if __name__ == "__main__":
     # create and run TB model
     model = TbModel()
     model.make_times(1900, 2050, 0.05)
-    model.integrate_explicit()
+    model.integrate("explicit")
 
     # plot results
     model.make_graph(os.path.join(out_dir, "tb_flow_diagram"))

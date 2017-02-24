@@ -433,19 +433,26 @@ class BaseModel:
             msg = "Compartment '%s' doesn't have any entry or transfer flows" % label
             assert label in connected_compartments, msg
 
-    def integrate_scipy(self):
+    def integrate(self, method="explicit"):
         """
-        Use the scipy integration package's odeint function to run integration
+        Master integration function to prepare for integration run and then call the process to actually run the
+        integration process according to the process selected in the arguments to this method.
+
+        Args:
+            method: Either "explicit" or "scipy" to select the integration process required
         """
 
         self.init_run()
         assert self.times is not None, "Haven't set times yet"
-        init_y = self.get_init_list()
         derivative = self.make_derivate_fn()
-        self.soln_array = odeint(derivative, init_y, self.times)
+        y = self.get_init_list()
+        if method == "explicit":
+            self.integrate_explicit(y, derivative)
+        elif method == "scipy":
+            self.soln_array = odeint(derivative, y, self.times)
         self.calculate_diagnostics()
 
-    def integrate_explicit(self, min_dt=0.05):
+    def integrate_explicit(self, y, derivative, min_dt=0.05):
         """
         Integrate with Euler explicit method
 
@@ -453,14 +460,10 @@ class BaseModel:
             min_dt:  Minimum time change allowed
         """
 
-        self.init_run()
-        assert self.times is not None, "Haven't set times yet"
-        y = self.get_init_list()
         n_component = len(y)
         n_time = len(self.times)
         self.soln_array = numpy.zeros((n_time, n_component))
 
-        derivative = self.make_derivate_fn()
         time = self.times[0]
         self.soln_array[0, :] = y
         for i_time, new_time in enumerate(self.times):
@@ -479,8 +482,6 @@ class BaseModel:
                         y[i] = 0.
             if i_time < n_time - 1:
                 self.soln_array[i_time + 1, :] = y
-
-        self.calculate_diagnostics()
 
     def calculate_diagnostic_vars(self):
         """
