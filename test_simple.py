@@ -6,7 +6,10 @@ import glob
 import pylab
 
 
-# Some static functions to avoid code repetition
+########################
+### Static functions ###
+########################
+
 def check_out_dir_exists(out_dir):
     """
     Make sure the output directory exists and create if it doesn't.
@@ -92,11 +95,14 @@ def plot_compartment_sizes(model):
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
 
 
-# define model objects based on BaseModel from basepop.py
+#############################################
+### Disease-specific model object classes ###
+#############################################
+
 class SeirModel(BaseModel):
     """
-    Based on the SEIR models from Vynnycky and White Chapter 3 and the corresponding on-line Excel
-    difference equation-based models for measles and for flu.
+    Based on the SEIR models from Vynnycky and White Chapter 3
+    and the corresponding on-line Excel difference equation-based models for measles and for flu.
     """
 
     def __init__(self, seir_param_dictionary):
@@ -156,14 +162,14 @@ class SeirModel(BaseModel):
                 self.vars["incidence"] += val / self.vars["population"] * 1E5
 
         # calculate prevalence
-        self.vars["prevalence"] = \
-            self.compartments["infectious"] \
-            / self.vars["population"] * 1E5
+        self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"] * 1E5
 
 
 class TbModel(BaseModel):
     """
-    Initial Autumn model designed by James
+    Basic underpinnings of the AuTuMN model for programmatic TB decision-support
+    Includes an example of the general approach to including a time-variant parameter that could then be modified to
+    simulate alternative programmatic responses to TB control (such as improvements in case detection)
     """
 
     def __init__(self):
@@ -194,14 +200,16 @@ class TbModel(BaseModel):
         self.set_param("program_rate_detect", 1.)
         time_treatment = .5
         self.set_param("program_time_treatment", time_treatment)
+        # infectious on treatment
         self.set_param("program_rate_completion_infect", .9 / time_treatment)
         self.set_param("program_rate_default_infect", .05 / time_treatment)
         self.set_param("program_rate_death_infect", .05 / time_treatment)
+        # noninfectious on treatment
         self.set_param("program_rate_completion_noninfect", .9 / time_treatment)
         self.set_param("program_rate_default_noninfect", .05 / time_treatment)
         self.set_param("program_rate_death_noninfect", .05 / time_treatment)
 
-        # set time-variant programmatic parameter (for case detection rate)
+        # set example time-variant programmatic parameter (for case detection rate)
         curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
         curve2 = make_sigmoidal_curve(y_high=4, y_low=2, x_start=1995, x_inflect=2003, multiplier=3)
         test_curve = lambda x: curve1(x) if x < 1990 else curve2(x)
@@ -211,21 +219,17 @@ class TbModel(BaseModel):
 
         # demographic variables
         self.vars["population"] = sum(self.compartments.values())
-        self.vars["rate_birth"] = \
-            self.params["demo_rate_birth"] * self.vars["population"]
+        self.vars["rate_birth"] = self.params["demo_rate_birth"] * self.vars["population"]
 
         # infectious population for force of infection calculations
         self.vars["infectious_population"] = 0.
         for label in self.labels:
             if 'active' in label or '_infect' in label:
-                self.vars["infectious_population"] += \
-                    self.compartments[label]
+                self.vars["infectious_population"] += self.compartments[label]
 
         # force of infection for direct use as a flow rate
-        self.vars["rate_force"] = \
-            self.params["tb_n_contact"] \
-            * self.vars["infectious_population"] \
-            / self.vars["population"]
+        self.vars["rate_force"] \
+            = self.params["tb_n_contact"] * self.vars["infectious_population"] / self.vars["population"]
 
     def set_flows(self):
 
@@ -245,7 +249,7 @@ class TbModel(BaseModel):
         self.set_infection_death_rate_flow("treatment_infect", "program_rate_death_infect")
         self.set_infection_death_rate_flow("treatment_noninfect", "program_rate_death_noninfect")
 
-        # programmatically variable rate(s)
+        # programmatically variable rate
         self.set_var_transfer_rate_flow("active", "treatment_infect", "program_rate_detect")
 
         # progression through treatment
@@ -264,12 +268,9 @@ class TbModel(BaseModel):
                 rate_incidence += val
 
         # calculate main epidemiological indicators
-        self.vars["prevalence"] \
-            = self.vars["infectious_population"] / self.vars["population"] * 1E5
-        self.vars["incidence"] \
-            = rate_incidence / self.vars["population"] * 1E5
-        self.vars["mortality"] \
-            = self.vars["rate_infection_death"] / self.vars["population"] * 1E5
+        self.vars["prevalence"] = self.vars["infectious_population"] / self.vars["population"] * 1E5
+        self.vars["incidence"] = rate_incidence / self.vars["population"] * 1E5
+        self.vars["mortality"] = self.vars["rate_infection_death"] / self.vars["population"] * 1E5
 
         # calculate proportion of population latently infected (including early and late)
         self.vars["latent"] = 0.
@@ -277,8 +278,10 @@ class TbModel(BaseModel):
             if "latent" in label:
                 self.vars["latent"] += self.compartments[label] / self.vars["population"] * 1E5
 
+##################
+### Run models ###
+##################
 
-# run models
 if __name__ == "__main__":
 
     ###################
