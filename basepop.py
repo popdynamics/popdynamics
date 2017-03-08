@@ -80,6 +80,31 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
     return curve
 
 
+def make_two_step_curve(
+    y_low, y_med, y_high, x_start, x_med, x_end):
+
+    curve1 = make_sigmoidal_curve(
+        y_high=y_med, y_low=y_low,
+        x_start=x_start, x_inflect=(x_med-x_start)*0.5 + x_start,
+        multiplier=4)
+
+    curve2 = make_sigmoidal_curve(
+        y_high=y_high, y_low=y_med,
+        x_start=x_med, x_inflect=(x_end-x_med)*0.5 + x_med,
+        multiplier=4)
+
+    def curve(x):
+        if x < x_start:
+            return y_low
+        if x < x_med:
+            return curve1(x)
+        if x < x_end:
+            return curve2(x)
+        return y_high
+
+    return curve
+
+
 class BaseModel:
     """
     Basic concepts
@@ -256,7 +281,7 @@ class BaseModel:
 
         self.scaleup_fns[label] = fn
 
-    def set_population_death_rate(self, param_label="demo_rate_death"):
+    def set_background_death_rate(self, param_label="demo_rate_death"):
         """
         Sets the population death rate to be applied to all compartments.
 
