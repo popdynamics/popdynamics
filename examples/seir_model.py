@@ -56,9 +56,9 @@ def plot_compartment_sizes(model):
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
 
 
-#############################################
-### Disease-specific model object classes ###
-#############################################
+######################################
+### Define SEIR model object class ###
+######################################
 
 class SeirModel(BaseModel):
     """
@@ -126,10 +126,10 @@ class SeirModel(BaseModel):
         self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"] * 1E5
 
 
+##################################
+### Create and run SEIR models ###
+##################################
 
-###################
-### SEIR models ###
-###################
 
 # define parameter values for two SEIR infections - measles and influenza
 seir_param_dictionary = {
