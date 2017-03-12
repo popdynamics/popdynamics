@@ -389,14 +389,14 @@ class BaseModel:
             self.flows[from_label] -= val
             self.flows[to_label] += val
 
-        # normal death flows
+        # background death flows
         self.vars["rate_death"] = 0.
         for label in self.labels:
             val = self.compartments[label] * self.background_death_rate
             self.flows[label] -= val
             self.vars["rate_death"] += val
 
-        # extra death flows
+        # extra infection-related death flows
         self.vars["rate_infection_death"] = 0.
         for label, rate in self.infection_death_rate_flows:
             val = self.compartments[label] * rate

@@ -55,7 +55,7 @@ class SimplifiedModel(BaseModel):
         self.vars["rate_birth"] = \
             self.params["demo_rate_birth"] * self.vars["population"]
 
-        self.vars["infectious_population"] = 0.0
+        self.vars["infectious_population"] = 0.
         for label in self.labels:
             if 'active' in label or '_infect' in label:
                 self.vars["infectious_population"] += \
@@ -106,7 +106,7 @@ class SimplifiedModel(BaseModel):
 
     def calculate_diagnostic_vars(self):
 
-        rate_incidence = 0.0
+        rate_incidence = 0.
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
             if 'latent' in from_label and 'active' in to_label:

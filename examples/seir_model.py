@@ -68,7 +68,7 @@ class SirModel(BaseModel):
     and the corresponding on-line Excel difference equation-based models for measles and for flu.
     """
 
-    def __init__(self, sir_param_dictionary):
+    def __init__(self, param_dictionary):
         """
         Takes a single dictionary of the parameter values to run the SIR model in order that the rest of the SIR
         model code can remain the same.
@@ -85,15 +85,15 @@ class SirModel(BaseModel):
 
         # set starting compartment values
         self.set_compartment("susceptible",
-                             sir_param_dictionary["population"] - sir_param_dictionary["start_infectious"])
-        self.set_compartment("infectious", sir_param_dictionary["start_infectious"])
+                             param_dictionary["population"] - param_dictionary["start_infectious"])
+        self.set_compartment("infectious", param_dictionary["start_infectious"])
         self.set_compartment("immune", 0.)
 
         # set model parameters
         self.set_param("infection_beta",
-                       sir_param_dictionary["r0"]
-                       / (sir_param_dictionary["duration_infectious"] * sir_param_dictionary["population"]))
-        self.set_param("infection_rate_recover", 1. / sir_param_dictionary["duration_infectious"])
+                       param_dictionary["r0"]
+                       / (param_dictionary["duration_infectious"] * param_dictionary["population"]))
+        self.set_param("infection_rate_recover", 1. / param_dictionary["duration_infectious"])
 
     def calculate_vars(self):
 
@@ -131,7 +131,7 @@ class SeirModel(SirModel):
     Nested inheritance from SirModel to use calculate_vars and calculate_diagnostic_vars
     """
 
-    def __init__(self, seir_param_dictionary):
+    def __init__(self, param_dictionary):
         """
         Takes a single dictionary of the parameter values to run the SEIR model in order that the rest of the SEIR
         model code can remain the same.
@@ -149,17 +149,17 @@ class SeirModel(SirModel):
 
         # set starting compartment values
         self.set_compartment("susceptible",
-                             seir_param_dictionary["population"] - seir_param_dictionary["start_infectious"])
+                             param_dictionary["population"] - param_dictionary["start_infectious"])
         self.set_compartment("preinfectious", 0.)
-        self.set_compartment("infectious", seir_param_dictionary["start_infectious"])
+        self.set_compartment("infectious", param_dictionary["start_infectious"])
         self.set_compartment("immune", 0.)
 
         # set model parameters
         self.set_param("infection_beta",
-                       seir_param_dictionary["r0"]
-                       / (seir_param_dictionary["duration_infectious"] * seir_param_dictionary["population"]))
-        self.set_param("infection_rate_progress", 1. / seir_param_dictionary["duration_preinfectious"])
-        self.set_param("infection_rate_recover", 1. / seir_param_dictionary["duration_infectious"])
+                       param_dictionary["r0"]
+                       / (param_dictionary["duration_infectious"] * param_dictionary["population"]))
+        self.set_param("infection_rate_progress", 1. / param_dictionary["duration_preinfectious"])
+        self.set_param("infection_rate_recover", 1. / param_dictionary["duration_infectious"])
 
     def set_flows(self):
 
@@ -170,10 +170,72 @@ class SeirModel(SirModel):
         self.set_fixed_transfer_rate_flow("preinfectious", "infectious", "infection_rate_progress")
         self.set_fixed_transfer_rate_flow("infectious", "immune", "infection_rate_recover")
 
+    def calculate_vars(self):
 
-#################################
-### Create and run SIR models ###
-#################################
+        # track total population size
+        self.vars["population"] = sum(self.compartments.values())
+
+        # calculate force of infection from beta (which was derived from R0 above)
+        self.vars["rate_force"] = self.params["infection_beta"] * self.compartments["infectious"]
+
+
+class SeirDemographyModel(SeirModel):
+
+    """
+    This is model 3.2 from Vynnycky and White online material, although it is largely described in Chapter 4 of the
+    textbook.
+    """
+
+    def __init__(self, param_dictionary):
+
+        BaseModel.__init__(self)
+
+        # set starting compartment values
+        self.set_compartment("susceptible",
+                             param_dictionary["population"] - param_dictionary["start_infectious"])
+        self.set_compartment("preinfectious", 0.)
+        self.set_compartment("infectious", param_dictionary["start_infectious"])
+        self.set_compartment("immune", 0.)
+
+        # set model parameters
+        self.set_param("infection_beta",
+                       param_dictionary["r0"]
+                       / (param_dictionary["duration_infectious"] * param_dictionary["population"]))
+        self.set_param("infection_rate_progress", 1. / param_dictionary["duration_preinfectious"])
+        self.set_param("infection_rate_recover", 1. / param_dictionary["duration_infectious"])
+        self.set_param("demo_rate_death", 1. / param_dictionary["life_expectancy"])
+        self.set_param("demo_rate_birth", self.params["demo_rate_death"])  # closed population
+
+    def set_flows(self):
+
+        # set variable birth rate
+        self.set_var_entry_rate_flow("susceptible", "rate_birth")
+
+        # set variable infection transition flow
+        self.set_var_transfer_rate_flow("susceptible", "preinfectious", "rate_force")
+
+        # set fixed inter-compartmental flows
+        self.set_fixed_transfer_rate_flow("preinfectious", "infectious", "infection_rate_progress")
+        self.set_fixed_transfer_rate_flow("infectious", "immune", "infection_rate_recover")
+
+        # set background, population-wide death rate
+        self.set_background_death_rate("demo_rate_death")
+
+    def calculate_vars(self):
+
+        # track total population size
+        self.vars["population"] = sum(self.compartments.values())
+
+        # set birth rate
+        self.vars["rate_birth"] = self.params["demo_rate_birth"] * self.vars["population"]
+
+        # calculate force of infection from beta (which was derived from R0 above)
+        self.vars["rate_force"] = self.params["infection_beta"] * self.compartments["infectious"]
+
+
+######################################
+### Create and run SIR/SEIR models ###
+######################################
 
 
 # define parameter values for two SEIR infections - measles and influenza
@@ -183,13 +245,15 @@ infection_param_dictionaries = {
          "start_infectious": 1.,
          "r0": 13.,
          "duration_preinfectious": 8.,
-         "duration_infectious": 7.},
+         "duration_infectious": 7.,
+         "life_expectancy": 70. * 365.},
     "flu":
         {"population": 1e6,
          "start_infectious": 1.,
          "r0": 2.,
          "duration_preinfectious": 2.,
-         "duration_infectious": 2.}
+         "duration_infectious": 2.,
+         "life_expectancy": 70. * 365.}
 }
 
 #############################
@@ -230,5 +294,19 @@ for infection in ["flu", "measles"]:
 
     # open output directory
     open_out_dir()
+
+# SEIR demography
+model = SeirDemographyModel(infection_param_dictionaries["measles"])
+model.make_times(0, 36500, 1)
+model.integrate("explicit")
+
+# set output directory
+out_dir = "measles_seir_demography_graphs"
+check_out_dir_exists(out_dir)
+
+# plot results
+model.make_graph(os.path.join(out_dir, "measles_flow_diagram"))
+plot_epidemiological_indicators(model, "measles", ["incidence", "prevalence"], out_dir)
+plot_compartment_sizes(model)
 
 
