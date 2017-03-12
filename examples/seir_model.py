@@ -260,7 +260,6 @@ infection_param_dictionaries = {
 ### Create and run models ###
 #############################
 
-
 # loop over infection types
 for infection in ["flu", "measles"]:
 
@@ -291,6 +290,13 @@ for infection in ["flu", "measles"]:
     model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
     plot_epidemiological_indicators(model, infection, ["incidence", "prevalence"], out_dir)
     plot_compartment_sizes(model)
+
+    # create figure 3 from model 4.1a spreadsheet in Vynnycky and White online materials
+    if infection == "flu":
+        pylab.clf()
+        pylab.semilogy(model.times, model.get_var_soln("incidence"), label="incidence")
+        pylab.legend()
+        pylab.savefig(os.path.join(out_dir, infection + '_logincidence.png'))
 
     # open output directory
     open_out_dir()
