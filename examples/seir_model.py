@@ -291,12 +291,24 @@ for infection in ["flu", "measles"]:
     plot_epidemiological_indicators(model, infection, ["incidence", "prevalence"], out_dir)
     plot_compartment_sizes(model)
 
-    # create figure 3 from model 4.1a spreadsheet in Vynnycky and White online materials
     if infection == "flu":
+        # create figure 3 from model 4.1a spreadsheet in Vynnycky and White online materials
         pylab.clf()
         pylab.semilogy(model.times, model.get_var_soln("incidence"), label="incidence")
         pylab.legend()
         pylab.savefig(os.path.join(out_dir, infection + '_logincidence.png'))
+
+        # create figure 2 from model 4.1a spreadsheet in Vynnycky and White online materials
+        pylab.clf()
+        compartment_props = {}
+        for compartment in model.compartments:
+            compartment_props[compartment] \
+                = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
+            pylab.plot(model.times, compartment_props[compartment], label="proportion " + compartment)
+        rn = [i * infection_param_dictionaries["flu"]["r0"] for i in compartment_props["susceptible"]]
+        pylab.plot(model.times, rn, label="Rn")
+        pylab.legend()
+        pylab.savefig(os.path.join(out_dir, infection + '_temp.png'))
 
     # open output directory
     open_out_dir()
