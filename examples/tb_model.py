@@ -1,8 +1,8 @@
+
 import sys
 import platform
 import os
 import glob
-import copy
 
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from basepop import BaseModel, make_sigmoidal_curve

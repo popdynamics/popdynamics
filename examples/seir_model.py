@@ -21,6 +21,7 @@ def open_out_dir():
     """
     Open the output dir at the end of the model run.
     """
+
     pngs = glob.glob(os.path.join(out_dir, '*png'))
     operating_system = platform.system()
     if 'Windows' in operating_system:
@@ -56,14 +57,78 @@ def plot_compartment_sizes(model):
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
 
 
-######################################
-### Define SEIR model object class ###
-######################################
+###################################
+### Define model object classes ###
+###################################
 
-class SeirModel(BaseModel):
+
+class SirModel(BaseModel):
     """
-    Based on the SEIR models from Vynnycky and White Chapter 3
+    Based on the SIR models from Vynnycky and White Chapter 2
     and the corresponding on-line Excel difference equation-based models for measles and for flu.
+    """
+
+    def __init__(self, sir_param_dictionary):
+        """
+        Takes a single dictionary of the parameter values to run the SIR model in order that the rest of the SIR
+        model code can remain the same.
+
+        Inputs:
+            param sir_param_dictionary: Dictionary with keys as follows:
+                population:             Total population size
+                start_infectious:       Number of infectious individuals at start of simulation
+                r0:                     The R0 value for the infecion
+                duration_infectious:    Number of days spent in the infectious compartment
+        """
+
+        BaseModel.__init__(self)
+
+        # set starting compartment values
+        self.set_compartment("susceptible",
+                             sir_param_dictionary["population"] - sir_param_dictionary["start_infectious"])
+        self.set_compartment("infectious", sir_param_dictionary["start_infectious"])
+        self.set_compartment("immune", 0.)
+
+        # set model parameters
+        self.set_param("infection_beta",
+                       sir_param_dictionary["r0"]
+                       / (sir_param_dictionary["duration_infectious"] * sir_param_dictionary["population"]))
+        self.set_param("infection_rate_recover", 1. / sir_param_dictionary["duration_infectious"])
+
+    def calculate_vars(self):
+
+        # track total population size
+        self.vars["population"] = sum(self.compartments.values())
+
+        # calculate force of infection from beta (which was derived from R0 above)
+        self.vars["rate_force"] = self.params["infection_beta"] * self.compartments["infectious"]
+
+    def set_flows(self):
+
+        # set variable infection transition flow
+        self.set_var_transfer_rate_flow("susceptible", "infectious", "rate_force")
+
+        # set fixed inter-compartmental flows
+        self.set_fixed_transfer_rate_flow("infectious", "immune", "infection_rate_recover")
+
+    def calculate_diagnostic_vars(self):
+
+        # calculate incidence
+        self.vars["incidence"] = 0.
+        for from_label, to_label, rate in self.fixed_transfer_rate_flows:
+            val = self.compartments[from_label] * rate
+            if "infectious" in to_label:
+                self.vars["incidence"] += val / self.vars["population"] * 1E5
+
+        # calculate prevalence
+        self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"] * 1E5
+
+
+class SeirModel(SirModel):
+    """
+    Based on the SEIR models from Vynnycky and White Chapters 2 and 3
+    and the corresponding on-line Excel difference equation-based models for measles and for flu.
+    Nested inheritance from SirModel to use calculate_vars and calculate_diagnostic_vars
     """
 
     def __init__(self, seir_param_dictionary):
@@ -96,14 +161,6 @@ class SeirModel(BaseModel):
         self.set_param("infection_rate_progress", 1. / seir_param_dictionary["duration_preinfectious"])
         self.set_param("infection_rate_recover", 1. / seir_param_dictionary["duration_infectious"])
 
-    def calculate_vars(self):
-
-        # track total population size
-        self.vars["population"] = sum(self.compartments.values())
-
-        # calculate force of infection from beta (which was derived from R0 above)
-        self.vars["rate_force"] = self.params["infection_beta"] * self.compartments["infectious"]
-
     def set_flows(self):
 
         # set variable infection transition flow
@@ -113,26 +170,14 @@ class SeirModel(BaseModel):
         self.set_fixed_transfer_rate_flow("preinfectious", "infectious", "infection_rate_progress")
         self.set_fixed_transfer_rate_flow("infectious", "immune", "infection_rate_recover")
 
-    def calculate_diagnostic_vars(self):
 
-        # calculate incidence
-        self.vars["incidence"] = 0.
-        for from_label, to_label, rate in self.fixed_transfer_rate_flows:
-            val = self.compartments[from_label] * rate
-            if "infectious" in to_label:
-                self.vars["incidence"] += val / self.vars["population"] * 1E5
-
-        # calculate prevalence
-        self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"] * 1E5
-
-
-##################################
-### Create and run SEIR models ###
-##################################
+#################################
+### Create and run SIR models ###
+#################################
 
 
 # define parameter values for two SEIR infections - measles and influenza
-seir_param_dictionary = {
+infection_param_dictionaries = {
     "measles":
         {"population": 1e6,
          "start_infectious": 1.,
@@ -147,16 +192,35 @@ seir_param_dictionary = {
          "duration_infectious": 2.}
 }
 
-# loop over SEIR infections
+#############################
+### Create and run models ###
+#############################
+
+
+# loop over infection types
 for infection in ["flu", "measles"]:
 
-    # instantiate model object
-    model = SeirModel(seir_param_dictionary[infection])
+    # SIR
+    model = SirModel(infection_param_dictionaries[infection])
     model.make_times(0, 200, 1)
     model.integrate("explicit")
 
     # set output directory
-    out_dir = infection + '_graphs'
+    out_dir = infection + '_sir_graphs'
+    check_out_dir_exists(out_dir)
+
+    # plot results
+    model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
+    plot_epidemiological_indicators(model, infection, ["incidence", "prevalence"], out_dir)
+    plot_compartment_sizes(model)
+
+    # SEIR
+    model = SeirModel(infection_param_dictionaries[infection])
+    model.make_times(0, 200, 1)
+    model.integrate("explicit")
+
+    # set output directory
+    out_dir = infection + '_seir_graphs'
     check_out_dir_exists(out_dir)
 
     # plot results
