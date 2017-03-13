@@ -67,7 +67,7 @@ def plot_compartment_sizes(model):
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
 
 
-def plot_compartment_proportions(model):
+def plot_compartment_proportions(model, infection):
     """
     Plot compartment proportions over time.
     """
@@ -345,7 +345,7 @@ for infection in ["flu", "measles"]:
         plot_epidemiological_indicators(model, "flu", ["incidence"], out_dir, ylog=True)
 
         # equivalent to figure 2 from "model 4.1a" spreadsheet in Vynnycky and White online materials
-        plot_compartment_proportions(model)
+        plot_compartment_proportions(model, infection)
 
     # open output directory
     open_out_dir()
@@ -364,6 +364,31 @@ check_out_dir_exists(out_dir)
 model.make_graph(os.path.join(out_dir, "measles_flow_diagram"))
 plot_epidemiological_indicators(model, "measles", ["incidence", "prevalence", "infections"], out_dir)
 plot_compartment_sizes(model)
+
+# illustrations of reasons for cyclical epidemics, from "model 4.3a" spreadsheet
+model.make_times(0, 365 * 50, 1)
+model.integrate("explicit")
+
+# find proportions
+compartment_props = {}
+for compartment in ["susceptible", "immune"]:
+    compartment_props[compartment] \
+        = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
+
+# plot incidence and susceptible proportion (second figure)
+pylab.clf()
+fig = pylab.figure()
+ax1 = fig.add_subplot(111)
+ax1.plot(model.times[365 * 40:], model.get_var_soln("incidence")[365 * 40:], label="incidence", color='r')
+ax1.set_ylabel("incidence per person per day")
+ax1.set_ylim(bottom=0.)
+ax1.legend(loc=2)
+ax2 = ax1.twinx()
+ax2.plot(model.times[365 * 40:], compartment_props["susceptible"][365 * 40:], label="susceptible")
+ax2.set_ylabel("proportion susceptible")
+ax2.set_ylim([0., 0.12])
+ax2.legend(loc=0)
+fig.savefig(os.path.join(out_dir, "cyclical_prop_susceptible.png"))
 
 
 # SEIR with partial population immunity from start
