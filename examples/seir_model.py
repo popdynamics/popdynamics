@@ -325,8 +325,8 @@ for infection in ["flu", "measles"]:
     plot_compartment_sizes(model)
 
     # SEIR
-    # this model is equivalent to that presented in spreadsheets "model 2.1" and "model 2.1a" of the online materials
-    # from Vynnycky and White
+    # this model is equivalent to that presented in spreadsheets "model 2.1", "model 2.1a" and "model 3.1" of the online materials
+    # from Vynnycky and White, although output graphs separate compartment sizes, proportions and epidemiological rates
     model = SeirModel(infection_param_dictionaries[infection])
     model.make_times(0, 200, 1)
     model.integrate("explicit")
@@ -341,16 +341,17 @@ for infection in ["flu", "measles"]:
     plot_compartment_sizes(model)
 
     if infection == "flu":
-        # create figure 3 from model 4.1a spreadsheet in Vynnycky and White online materials
+        # equivalent to figure 3 from "model 4.1a" spreadsheet in Vynnycky and White online materials
         plot_epidemiological_indicators(model, "flu", ["incidence"], out_dir, ylog=True)
 
-        # create figure 2 from model 4.1a spreadsheet in Vynnycky and White online materials
+        # equivalent to figure 2 from "model 4.1a" spreadsheet in Vynnycky and White online materials
         plot_compartment_proportions(model)
 
     # open output directory
     open_out_dir()
 
 # SEIR demography
+# this model is equivalent to that from "model 3.2" spreadsheet of the Vynnycky and White online materials
 model = SeirDemographyModel(infection_param_dictionaries["measles"])
 model.make_times(0, 36500, 1)
 model.integrate("explicit")
@@ -361,7 +362,29 @@ check_out_dir_exists(out_dir)
 
 # plot results
 model.make_graph(os.path.join(out_dir, "measles_flow_diagram"))
-plot_epidemiological_indicators(model, "measles", ["incidence", "prevalence"], out_dir)
+plot_epidemiological_indicators(model, "measles", ["incidence", "prevalence", "infections"], out_dir)
 plot_compartment_sizes(model)
 
 
+# SEIR with partial population immunity from start
+# equivalent to figure from "model 4.2" spreadsheet in Vynnycky and White
+partial_immunity_params = {"population": 5234.,
+                           "start_infectious": 2.,
+                           "r0": 2.1,
+                           "duration_preinfectious": 2.,
+                           "duration_infectious": 2.,
+                           "life_expectancy": 70. * 365.}
+model = SeirModel(partial_immunity_params)
+
+# redistribute 30% of susceptibles to the immune compartment
+model.set_compartment("immune", 0.3 * model.init_compartments["susceptible"])
+model.set_compartment("susceptible", 0.7 * model.init_compartments["susceptible"])
+
+# integrate
+model.make_times(0, 120, 1)
+model.integrate("explicit")
+
+# set output directory
+out_dir = 'partial_immunity_graphs'
+check_out_dir_exists(out_dir)
+plot_compartment_sizes(model)
