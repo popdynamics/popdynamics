@@ -30,7 +30,7 @@ def open_out_dir():
         os.system('open ' + " ".join(pngs))
 
 
-def plot_epidemiological_indicators(model, infection, indicators, out_dir):
+def plot_epidemiological_indicators(model, infection, indicators, out_dir, ylog=False):
     """
     Plot epidemiological outputs recorded in the model object.
 
@@ -40,9 +40,17 @@ def plot_epidemiological_indicators(model, infection, indicators, out_dir):
 
     pylab.clf()
     for var_key in indicators:
-        pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
+        if not ylog:
+            pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
+        else:
+            pylab.semilogy(model.times, model.get_var_soln(var_key), label=var_key)
     pylab.legend()
-    pylab.savefig(os.path.join(out_dir, infection + '_indicators.png'))
+    pylab.ylabel("per person per day")
+    pylab.title("Rates")
+    if not ylog:
+        pylab.savefig(os.path.join(out_dir, infection + "_indicators.png"))
+    else:
+        pylab.savefig(os.path.join(out_dir, infection + "_log_indicators.png"))
 
 
 def plot_compartment_sizes(model):
@@ -54,7 +62,27 @@ def plot_compartment_sizes(model):
     for compartment in model.compartments:
         pylab.plot(model.times, model.get_compartment_soln(compartment), label=compartment)
     pylab.legend()
+    pylab.ylabel("persons")
+    pylab.title("Populations")
     pylab.savefig(os.path.join(out_dir, 'compartment_sizes.png'))
+
+
+def plot_compartment_proportions(model):
+    """
+    Plot compartment proportions over time.
+    """
+
+    pylab.clf()
+    compartment_props = {}
+    for compartment in model.compartments:
+        compartment_props[compartment] \
+            = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
+        pylab.plot(model.times, compartment_props[compartment], label=compartment)
+    r_n = [i * infection_param_dictionaries["flu"]["r0"] for i in compartment_props["susceptible"]]
+    pylab.plot(model.times, r_n, label="Rn")
+    pylab.title("Compartment proportions (and Rn)")
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, infection + '_proportions.png'))
 
 
 ###################################
@@ -118,10 +146,10 @@ class SirModel(BaseModel):
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
             if "infectious" in to_label:
-                self.vars["incidence"] += val / self.vars["population"] * 1E5
+                self.vars["incidence"] += val / self.vars["population"]
 
         # calculate prevalence
-        self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"] * 1E5
+        self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"]
 
 
 class SeirModel(SirModel):
@@ -177,6 +205,25 @@ class SeirModel(SirModel):
 
         # calculate force of infection from beta (which was derived from R0 above)
         self.vars["rate_force"] = self.params["infection_beta"] * self.compartments["infectious"]
+
+    def calculate_diagnostic_vars(self):
+
+        # calculate incidence
+        self.vars["incidence"] = 0.
+        for from_label, to_label, rate in self.fixed_transfer_rate_flows:
+            val = self.compartments[from_label] * rate
+            if "infectious" in to_label:
+                self.vars["incidence"] += val / self.vars["population"]
+
+        # calculate new infections
+        self.vars["infections"] = 0.
+        for from_label, to_label, rate in self.var_transfer_rate_flows:
+            val = self.compartments[from_label] * self.vars[rate]
+            if "preinfectious" in to_label:
+                self.vars["infections"] += val / self.vars["population"]
+
+        # calculate prevalence
+        self.vars["prevalence"] = self.compartments["infectious"] / self.vars["population"]
 
 
 class SeirDemographyModel(SeirModel):
@@ -278,6 +325,8 @@ for infection in ["flu", "measles"]:
     plot_compartment_sizes(model)
 
     # SEIR
+    # this model is equivalent to that presented in spreadsheets "model 2.1" and "model 2.1a" of the online materials
+    # from Vynnycky and White
     model = SeirModel(infection_param_dictionaries[infection])
     model.make_times(0, 200, 1)
     model.integrate("explicit")
@@ -288,27 +337,15 @@ for infection in ["flu", "measles"]:
 
     # plot results
     model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
-    plot_epidemiological_indicators(model, infection, ["incidence", "prevalence"], out_dir)
+    plot_epidemiological_indicators(model, infection, ["incidence", "prevalence", "infections"], out_dir)
     plot_compartment_sizes(model)
 
     if infection == "flu":
         # create figure 3 from model 4.1a spreadsheet in Vynnycky and White online materials
-        pylab.clf()
-        pylab.semilogy(model.times, model.get_var_soln("incidence"), label="incidence")
-        pylab.legend()
-        pylab.savefig(os.path.join(out_dir, infection + '_logincidence.png'))
+        plot_epidemiological_indicators(model, "flu", ["incidence"], out_dir, ylog=True)
 
         # create figure 2 from model 4.1a spreadsheet in Vynnycky and White online materials
-        pylab.clf()
-        compartment_props = {}
-        for compartment in model.compartments:
-            compartment_props[compartment] \
-                = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
-            pylab.plot(model.times, compartment_props[compartment], label="proportion " + compartment)
-        rn = [i * infection_param_dictionaries["flu"]["r0"] for i in compartment_props["susceptible"]]
-        pylab.plot(model.times, rn, label="Rn")
-        pylab.legend()
-        pylab.savefig(os.path.join(out_dir, infection + '_temp.png'))
+        plot_compartment_proportions(model)
 
     # open output directory
     open_out_dir()
