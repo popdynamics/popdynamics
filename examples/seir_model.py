@@ -390,6 +390,20 @@ ax2.set_ylim([0., 0.12])
 ax2.legend(loc=0)
 fig.savefig(os.path.join(out_dir, "cyclical_prop_susceptible.png"))
 
+# plot incidence and immune proportion (Figure 3)
+pylab.clf()
+fig = pylab.figure()
+ax1 = fig.add_subplot(111)
+ax1.plot(model.times[365 * 40:], model.get_var_soln("incidence")[365 * 40:], label="incidence", color='r')
+ax1.set_ylabel("incidence per person per day")
+ax1.set_ylim(bottom=0.)
+ax1.legend(loc=2)
+ax2 = ax1.twinx()
+ax2.plot(model.times[365 * 40:], compartment_props["immune"][365 * 40:], label="immune")
+ax2.set_ylabel("proportion immune")
+ax2.set_ylim([0.88, 0.96])
+ax2.legend(loc=0)
+fig.savefig(os.path.join(out_dir, "cyclical_prop_immune.png"))
 
 # SEIR with partial population immunity from start
 # equivalent to figure from "model 4.2" spreadsheet in Vynnycky and White
