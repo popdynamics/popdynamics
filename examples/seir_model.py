@@ -154,8 +154,8 @@ class SirModel(BaseModel):
 
 class SeirModel(SirModel):
     """
-    Based on the SEIR models from Vynnycky and White Chapters 2 and 3
-    and the corresponding on-line Excel difference equation-based models for measles and for flu.
+    Based on the SEIR models from Vynnycky and White Chapters 2 and 3 and the corresponding online Excel difference
+    equation-based models for measles and for flu.
     Nested inheritance from SirModel to use calculate_vars and calculate_diagnostic_vars
     """
 
@@ -227,7 +227,6 @@ class SeirModel(SirModel):
 
 
 class SeirDemographyModel(SeirModel):
-
     """
     This is model 3.2 from Vynnycky and White online material, although it is largely described in Chapter 4 of the
     textbook.
@@ -284,7 +283,7 @@ class SeirDemographyModel(SeirModel):
 ### Create and run SIR/SEIR models ###
 ######################################
 
-# define parameter values for two SEIR infections - measles and influenza
+# define parameter values for the main two SEIR infections - measles and influenza
 infection_param_dictionaries = {
     "measles":
         {"population": 1e6,
@@ -301,6 +300,7 @@ infection_param_dictionaries = {
          "duration_infectious": 2.,
          "life_expectancy": 70. * 365.}
 }
+
 
 #############################
 ### Create and run models ###
@@ -324,8 +324,9 @@ for infection in ["flu", "measles"]:
     plot_compartment_sizes(model)
 
     # SEIR
-    # this model is equivalent to that presented in spreadsheets "model 2.1", "model 2.1a" and "model 3.1" of the online materials
-    # from Vynnycky and White, although output graphs separate compartment sizes, proportions and epidemiological rates
+    # model equivalent to that presented in spreadsheets "model 2.1", "model 2.1a" and "model 3.1" of the online
+    # materials from Vynnycky and White, although these output graphs separate compartment sizes, proportions and
+    # epidemiological rates from each other
     model = SeirModel(infection_param_dictionaries[infection])
     model.make_times(0, 200, 1)
     model.integrate("explicit")
@@ -340,17 +341,17 @@ for infection in ["flu", "measles"]:
     plot_compartment_sizes(model)
 
     if infection == "flu":
-        # equivalent to figure 3 from "model 4.1a" spreadsheet in Vynnycky and White online materials
+        # equivalent to figure 3 from "model 4.1a" spreadsheet
         plot_epidemiological_indicators(model, "flu", ["incidence"], out_dir, ylog=True)
 
-        # equivalent to figure 2 from "model 4.1a" spreadsheet in Vynnycky and White online materials
+        # equivalent to figure 2 from "model 4.1a" spreadsheet
         plot_compartment_proportions(model, infection)
 
     # open output directory
     open_out_dir()
 
 # SEIR demography
-# this model is equivalent to that from "model 3.2" spreadsheet of the Vynnycky and White online materials
+# this model is equivalent to that from "model 3.2" spreadsheet
 model = SeirDemographyModel(infection_param_dictionaries["measles"])
 model.make_times(0, 36500, 1)
 model.integrate("explicit")
@@ -368,12 +369,27 @@ plot_compartment_sizes(model)
 model.make_times(0, 365 * 50, 1)
 model.integrate("explicit")
 
-# find proportions
+# find proportions and Rn for plotting in following sections
 compartment_props = {}
 for compartment in ["susceptible", "immune"]:
     compartment_props[compartment] \
         = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
 r_n = [i * infection_param_dictionaries["measles"]["r0"] for i in compartment_props["susceptible"]]
+
+# plot incidence and Rn (Figure 1)
+pylab.clf()
+fig = pylab.figure()
+ax1 = fig.add_subplot(111)
+ax1.plot(model.times[365 * 40:], model.get_var_soln("incidence")[365 * 40:], label="incidence", color='r')
+ax1.set_ylabel("incidence per person per day")
+ax1.set_ylim(bottom=0.)
+ax1.legend(loc=2)
+ax2 = ax1.twinx()
+ax2.plot(model.times[365 * 40:], r_n[365 * 40:], label="Rn")
+ax2.set_ylabel("Rn")
+ax2.set_ylim([0.5, 1.5])
+ax2.legend(loc=0)
+fig.savefig(os.path.join(out_dir, "cyclical_r_n.png"))
 
 # plot incidence and susceptible proportion (second figure)
 pylab.clf()
@@ -405,23 +421,9 @@ ax2.set_ylim([0.88, 0.96])
 ax2.legend(loc=0)
 fig.savefig(os.path.join(out_dir, "cyclical_prop_immune.png"))
 
-# plot incidence and Rn (Figure 1)
-pylab.clf()
-fig = pylab.figure()
-ax1 = fig.add_subplot(111)
-ax1.plot(model.times[365 * 40:], model.get_var_soln("incidence")[365 * 40:], label="incidence", color='r')
-ax1.set_ylabel("incidence per person per day")
-ax1.set_ylim(bottom=0.)
-ax1.legend(loc=2)
-ax2 = ax1.twinx()
-ax2.plot(model.times[365 * 40:], r_n[365 * 40:], label="Rn")
-ax2.set_ylabel("Rn")
-ax2.set_ylim([0.5, 1.5])
-ax2.legend(loc=0)
-fig.savefig(os.path.join(out_dir, "cyclical_r_n.png"))
-
 # SEIR with partial population immunity from start
-# equivalent to figure from "model 4.2" spreadsheet in Vynnycky and White
+# equivalent to figure from "model 4.2" spreadsheet in Vynnycky and White (note population sizes different and
+# parameters slightly different)
 partial_immunity_params = {"population": 5234.,
                            "start_infectious": 2.,
                            "r0": 2.1,
