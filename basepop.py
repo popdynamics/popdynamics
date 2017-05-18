@@ -29,7 +29,7 @@ def label_intersects_tags(label, tags):
     """
     Determine whether a string is contained within a list of strings for use in functions such as calculation of the
     force of infection, where we might want a list of all the compartments that contain a particular string
-    (such as "active" or "infectious").
+    (such as 'active' or 'infectious').
 
     Args:
         label: The string we're searching for
@@ -187,6 +187,10 @@ class BaseModel:
             self.times: List of numerical times for integration to be assessed at
         """
 
+        assert type(start) is float or type(start) is int, 'Start time not specified with float'
+        assert type(end) is float or type(end) is int, 'End time not specified with a number'
+        assert type(delta) is float or type(delta) is int, 'Time increment not specified with a number'
+        assert end >= start, 'End time is before start time'
         self.times = []
         step = start
         while step <= end:
@@ -220,10 +224,12 @@ class BaseModel:
             init_val: Starting value for that compartment (default behaviour is to start from empty compartment)
         """
 
+        assert type(label) is str, 'Compartment label for initial setting not string'
+        assert type(init_val) is float, 'Value to start % compartment from not string' % label
+        assert init_val >= 0., 'Start with negative compartment not permitted'
         if label not in self.labels:
             self.labels.append(label)
         self.init_compartments[label] = init_val
-        assert init_val >= 0., 'Start with negative compartment not permitted'
 
     def set_param(self, label, val):
         """
@@ -234,6 +240,8 @@ class BaseModel:
             val: Value (generally float) for the parameter
         """
 
+        assert type(label) is str, 'Parameter name is not string'
+        assert type(val) is float or type(val) is int, 'Fixed parameter value is not numeric for %' % label
         self.params[label] = val
 
     def convert_list_to_compartments(self, vec):
@@ -275,13 +283,14 @@ class BaseModel:
         Simple method to add a scale-up function to the dictionary of scale-ups.
 
         Args:
-            label: String for name of function.
-            fn: The function to be added.
+            label: String for name of function
+            fn: The function to be added
         """
 
+        assert type(label) is str, 'Name of scale-up function is not string'
         self.scaleup_fns[label] = fn
 
-    def set_background_death_rate(self, param_label="demo_rate_death"):
+    def set_background_death_rate(self, param_label='demo_rate_death'):
         """
         Sets the population death rate to be applied to all compartments.
 
@@ -289,6 +298,8 @@ class BaseModel:
             param_label: String for the population death rate
         """
 
+        assert type(self.background_death_rate) is float, 'Background death rate is not float'
+        assert self.background_death_rate >= 0., 'Background death rate is negative'
         self.background_death_rate = self.params[param_label]
 
     def set_infection_death_rate_flow(self, label, param_label):
@@ -300,8 +311,9 @@ class BaseModel:
             param_label: String of the parameter to be used for setting the death rate
         """
 
-        add_unique_tuple_to_list(self.infection_death_rate_flows,
-                                 (label, self.params[param_label]))
+        assert type(label) is str, 'Compartment label not string when setting infection death rate'
+        assert type(param_label) is str, 'Parameter label not string when setting infection death rate'
+        add_unique_tuple_to_list(self.infection_death_rate_flows, (label, self.params[param_label]))
 
     def set_fixed_transfer_rate_flow(self, from_label, to_label, param_label):
         """
@@ -314,9 +326,9 @@ class BaseModel:
             param_label: String of the parameter to be used for setting this transition rate
         """
 
-        add_unique_tuple_to_list(
-            self.fixed_transfer_rate_flows,
-            (from_label, to_label, self.params[param_label]))
+        assert type(from_label) is str, 'Origin compartment label not string for setting fixed transfer rate'
+        assert type(to_label) is str, 'Destination compartment label not string for setting fixed transfer rate'
+        add_unique_tuple_to_list(self.fixed_transfer_rate_flows, (from_label, to_label, self.params[param_label]))
 
     def set_var_transfer_rate_flow(self, from_label, to_label, var_label):
         """
@@ -330,9 +342,10 @@ class BaseModel:
             param_label: String of the parameter to be used for setting this transition rate
         """
 
-        add_unique_tuple_to_list(
-            self.var_transfer_rate_flows,
-            (from_label, to_label, var_label))
+        assert type(from_label) is str, 'Origin compartment label not string for setting variable transfer rate'
+        assert type(to_label) is str, 'Destination compartment label not string for setting variable transfer rate'
+        assert type(var_label) is str, 'Function label not string for setting fixed transfer rate'
+        add_unique_tuple_to_list(self.var_transfer_rate_flows, (from_label, to_label, var_label))
 
     def set_var_entry_rate_flow(self, label, var_label):
         """
@@ -343,9 +356,9 @@ class BaseModel:
             var_label: String of the var to be used for setting this entry rate
         """
 
-        add_unique_tuple_to_list(
-            self.var_entry_rate_flow,
-            (label, var_label))
+        assert type(label) is str, 'Destination compartment label not string for setting variable transfer rate'
+        assert type(var_label) is str, 'Function label not string for setting variable entry rate'
+        add_unique_tuple_to_list(self.var_entry_rate_flow, (label, var_label))
 
     def calculate_scaleup_vars(self):
         """
@@ -390,18 +403,18 @@ class BaseModel:
             self.flows[to_label] += val
 
         # background death flows
-        self.vars["rate_death"] = 0.
+        self.vars['rate_death'] = 0.
         for label in self.labels:
             val = self.compartments[label] * self.background_death_rate
             self.flows[label] -= val
-            self.vars["rate_death"] += val
+            self.vars['rate_death'] += val
 
         # extra infection-related death flows
-        self.vars["rate_infection_death"] = 0.
+        self.vars['rate_infection_death'] = 0.
         for label, rate in self.infection_death_rate_flows:
             val = self.compartments[label] * rate
             self.flows[label] -= val
-            self.vars["rate_infection_death"] += val
+            self.vars['rate_infection_death'] += val
 
     def prepare_vars_and_flows(self):
         """
@@ -455,25 +468,25 @@ class BaseModel:
               + labels_with_fixed_out + labels_with_fixed_in
 
         for label in self.labels:
-            msg = "Compartment '%s' doesn't have any entry or transfer flows" % label
+            msg = 'Compartment "%s" doesn\'t have any entry or transfer flows' % label
             assert label in connected_compartments, msg
 
-    def integrate(self, method="explicit"):
+    def integrate(self, method='explicit'):
         """
         Master integration function to prepare for integration run and then call the process to actually run the
         integration process according to the process selected in the arguments to this method.
 
         Args:
-            method: Either "explicit" or "scipy" to select the integration process required
+            method: Either 'explicit' or 'scipy' to select the integration process required
         """
 
         self.init_run()
-        assert self.times is not None, "Haven't set times yet"
+        assert self.times is not None, 'Haven\'t set times yet'
         derivative = self.make_derivate_fn()
         y = self.get_init_list()
-        if method == "explicit":
+        if method == 'explicit':
             self.integrate_explicit(y, derivative)
-        elif method == "scipy":
+        elif method == 'scipy':
             self.soln_array = odeint(derivative, y, self.times)
         self.calculate_diagnostics()
 
@@ -559,7 +572,7 @@ class BaseModel:
                 for v, t
                 in zip(
                     self.population_soln[label],
-                    self.get_var_soln("population")
+                    self.get_var_soln('population')
                 )
             ]
 
@@ -573,7 +586,7 @@ class BaseModel:
             List of values for this compartment's values over time
         """
 
-        assert self.soln_array is not None, "calculate_diagnostics has not been run"
+        assert self.soln_array is not None, 'calculate_diagnostics has not been run'
         i_label = self.labels.index(label)
         return self.soln_array[:, i_label]
 
@@ -587,7 +600,7 @@ class BaseModel:
             List of values for this var's values over time
         """
 
-        assert self.var_array is not None, "calculate_diagnostics has not been run"
+        assert self.var_array is not None, 'calculate_diagnostics has not been run'
         i_label = self.var_labels.index(label)
         return self.var_array[:, i_label]
 
@@ -601,7 +614,7 @@ class BaseModel:
             List of values for this compartment's flows over time
         """
 
-        assert self.flow_array is not None, "calculate_diagnostics has not been run"
+        assert self.flow_array is not None, 'calculate_diagnostics has not been run'
         i_label = self.labels.index(label)
         return self.flow_array[:, i_label]
 
@@ -681,37 +694,41 @@ class BaseModel:
             return graph
 
         def num_str(f):
-            abs_f = abs(f)
-            if abs_f > 1E9:
-                return "%.1fB" % (f / 1E9)
-            if abs_f > 1E6:
-                return "%.1fM" % (f / 1E6)
-            if abs_f > 1E3:
-                return "%.1fK" % (f / 1E3)
-            if abs_f > 100:
-                return "%.0f" % f
-            if abs_f > 0.5:
-                return "%.1f" % f
-            if abs_f > 0.05:
-                return "%.2f" % f
-            if abs_f > 0.0005:
-                return "%.4f" % f
-            if abs_f > 0.000005:
-                return "%.6f" % f
-            return str(f)
+
+            return '%.3g' % f
+
+            # alternative code to uncomment if you prefer more natural language, rather than scientific notation
+            # abs_f = abs(f)
+            # if abs_f > 1e9:
+            #     return '%.1f billion' % (f / 1e9)
+            # if abs_f > 1e6:
+            #     return '%.1f million' % (f / 1e6)
+            # if abs_f > 1e3:
+            #     return '%.1f thousand' % (f / 1e3)
+            # if abs_f > 1e2:
+            #     return '%.0f' % f
+            # if abs_f > 0.5:
+            #     return '%.1f' % f
+            # if abs_f > 5e-2:
+            #     return '%.2f' % f
+            # if abs_f > 5e-4:
+            #     return '%.4f' % f
+            # if abs_f > 5e-6:
+            #     return '%.6f' % f
+            # return str(f)
 
         self.graph = Digraph(format='png')
         for label in self.labels:
             self.graph.node(label)
         if len(self.infection_death_rate_flows) > 0:
-            self.graph.node("infection_death")
+            self.graph.node('infection_death')
         for from_label, to_label, var_label in self.var_transfer_rate_flows:
             self.graph.edge(from_label, to_label, label=var_label)
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             self.graph.edge(from_label, to_label, label=num_str(rate))
         if len(self.infection_death_rate_flows) > 0:
             for label, rate in self.infection_death_rate_flows:
-                self.graph.edge(label, "infection_death", label=num_str(rate))
+                self.graph.edge(label, 'infection_death', label=num_str(rate))
         base, ext = os.path.splitext(png)
         if ext.lower() != '.png':
             base = png
