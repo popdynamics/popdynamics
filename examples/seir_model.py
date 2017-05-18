@@ -8,6 +8,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from basepop import BaseModel
 import pylab
 
+#test
+
 """
 The following file creates and executes models with SIR and SEIR structures. It then graphs the results and presents the
 models' underlying compartmental structure.
