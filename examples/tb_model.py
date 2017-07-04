@@ -106,7 +106,7 @@ class SimpleTbModel(BaseModel):
     Nested inheritance from BaseModel, which applies to any infectious disease generally.
     """
 
-    def __init__(self, interventions=[]):
+    def __init__(self, fixed_parameters, interventions=[]):
         """
         Inputs:
             interventions: List of interventions to be simulated in the run of the model
@@ -127,27 +127,9 @@ class SimpleTbModel(BaseModel):
         if 'vaccination' in self.interventions:
             self.set_compartment('susceptible_vaccinated', 0.)
 
-        # demographic parameters
-        self.set_param('demo_rate_birth', 20. / 1e3)
-        self.set_param('demo_rate_death', 1. / 65)
-
-        # disease-specific parameters
-        self.set_param('tb_n_contact', 40.)
-        self.set_param('tb_rate_earlyprogress', .1 / .5)
-        self.set_param('tb_rate_lateprogress', .1 / 100.)
-        self.set_param('tb_rate_stabilise', .9 / .5)
-        self.set_param('tb_rate_recover', .6 / 3.)
-        self.set_param('tb_rate_death', .4 / 3.)
-
-        # programmatic parameters
-        time_treatment = .5
-        self.set_param('program_time_treatment', time_treatment)
-        self.set_param('program_rate_completion_infect', .9 / time_treatment)
-        self.set_param('program_rate_default_infect', .05 / time_treatment)
-        self.set_param('program_rate_death_infect', .05 / time_treatment)
-        self.set_param('program_rate_completion_noninfect', .9 / time_treatment)
-        self.set_param('program_rate_default_noninfect', .05 / time_treatment)
-        self.set_param('program_rate_death_noninfect', .05 / time_treatment)
+        # parameter setting
+        for parameter, value in fixed_parameters.items():
+            self.set_param(parameter, value)
 
         # example of a scaling parameter (case detection rate)
         curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
@@ -249,7 +231,26 @@ if __name__ == '__main__':
 
     # create a simple TB model without any interventions and a single scaling parameter for case detection rate
     # (as shown in the instantiation of the TB model object)
-    model = SimpleTbModel()
+
+    time_treatment = .5
+    fixed_parameters = {
+        'demo_rate_birth': 20. / 1e3,
+        'demo_rate_death': 1. / 65,
+        'tb_n_contact': 40.,
+        'tb_rate_earlyprogress': .1 / .5,
+        'tb_rate_lateprogress': .1 / 100.,
+        'tb_rate_stabilise': .9 / .5,
+        'tb_rate_recover': .6 / 3.,
+        'tb_rate_death': .4 / 3.,
+        'program_rate_completion_infect': .9 / time_treatment,
+        'program_rate_default_infect': .05 / time_treatment,
+        'program_rate_death_infect': .05 / time_treatment,
+        'program_rate_completion_noninfect': .9 / time_treatment,
+        'program_rate_default_noninfect': .05 / time_treatment,
+        'program_rate_death_noninfect': .05 / time_treatment
+    }
+
+    model = SimpleTbModel(fixed_parameters)
     model.make_times(1900, 2050, .05)
     model.integrate(method='explicit')
 
@@ -261,7 +262,7 @@ if __name__ == '__main__':
     show_pngs(out_dir)
 
     # add vaccination as an intervention to the same model as run and presented immediately above
-    model = SimpleTbModel(['vaccination'])
+    model = SimpleTbModel(fixed_parameters, ['vaccination'])
     model.make_times(1900, 2050, .05)
     model.integrate(method='explicit')
 
