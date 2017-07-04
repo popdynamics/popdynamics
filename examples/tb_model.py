@@ -119,11 +119,9 @@ class SimpleTbModel(BaseModel):
 
         # base compartments
         self.set_compartment('susceptible', 1e6)
-        self.set_compartment('latent_early', 0.)
-        self.set_compartment('latent_late', 0.)
         self.set_compartment('active', 1.)
-        self.set_compartment('treatment_infect', 0.)
-        self.set_compartment('treatment_noninfect', 0.)
+        for compartment in ['latent_early', 'latent_late', 'treatment_infect', 'treatment_noninfect']:
+            self.set_compartment(compartment, 0.)
 
         # additional compartments needed for interventions
         if 'vaccination' in self.interventions:
