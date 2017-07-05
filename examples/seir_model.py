@@ -7,6 +7,7 @@ import sys
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from basepop import BaseModel
 import pylab
+import tool_kit
 
 """
 The following file creates and executes models with SIR and SEIR structures. It then graphs the results and presents the
@@ -38,27 +39,6 @@ Suggestion to get started:
 - Try adapting the SEIR model without demography to an SEIS model, by removing the recovered compartment and changing
  the recovery transition to move patients from infectious to susceptible (rather than recovered).
 """
-
-
-def check_out_dir_exists(out_dir):
-    """
-    Make sure the output directory exists and create if it doesn't.
-    """
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-
-def open_out_dir():
-    """
-    Open the output dir at the end of the model run.
-    """
-
-    pngs = glob.glob(os.path.join(out_dir, '*png'))
-    operating_system = platform.system()
-    if 'Windows' in operating_system:
-        os.system("start " + " ".join(pngs))
-    elif 'Darwin' in operating_system:
-        os.system('open ' + " ".join(pngs))
 
 
 def plot_epidemiological_indicators(model, infection, indicators, out_dir, ylog=False):
@@ -350,7 +330,7 @@ for infection in ['flu', 'measles']:
 
     # set output directory
     out_dir = infection + '_sir_graphs'
-    check_out_dir_exists(out_dir)
+    tool_kit.ensure_out_dir(out_dir)
 
     # plot results
     model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
@@ -367,7 +347,7 @@ for infection in ['flu', 'measles']:
 
     # set output directory
     out_dir = infection + '_seir_graphs'
-    check_out_dir_exists(out_dir)
+    tool_kit.ensure_out_dir(out_dir)
 
     # plot results
     model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
@@ -382,7 +362,7 @@ for infection in ['flu', 'measles']:
         plot_compartment_proportions(model, infection)
 
     # open output directory
-    open_out_dir()
+    tool_kit.open_out_dir(out_dir)
 
 #############################
 # SEIR with demography
@@ -394,7 +374,7 @@ model.integrate('explicit')
 
 # set output directory
 out_dir = 'measles_seir_demography_graphs'
-check_out_dir_exists(out_dir)
+tool_kit.ensure_out_dir(out_dir)
 
 # plot results
 model.make_graph(os.path.join(out_dir, 'measles_flow_diagram'))
@@ -480,5 +460,5 @@ model.integrate('explicit')
 
 # set output directory
 out_dir = 'partial_immunity_graphs'
-check_out_dir_exists(out_dir)
+tool_kit.ensure_out_dir(out_dir)
 plot_compartment_sizes(model)

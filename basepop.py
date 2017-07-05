@@ -10,6 +10,10 @@ from scipy.integrate import odeint
 import numpy
 from math import exp
 
+"""
+First section contains general, static methods for use by BaseModel object in creating any epidemiological model object.
+"""
+
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """

@@ -6,6 +6,8 @@ import glob
 
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from basepop import BaseModel, make_sigmoidal_curve
+import tool_kit
+
 
 """
 This file presents a transmission dynamic model for TB based on those most commonly used by the AuTuMN team
@@ -37,20 +39,6 @@ Suggestion to get started:
 ### Static functions for graphing and managing files ###
 ########################################################
 
-def ensure_dir(out_dir):
-    """
-    Make sure the output directory exists.
-
-    Args:
-        out_dir: String for the output directory name
-    """
-
-    try: 
-        os.makedirs(out_dir)
-    except OSError:
-        if not os.path.isdir(out_dir):
-            raise
-
 
 def make_plots(model, out_dir):
     """
@@ -78,22 +66,6 @@ def make_plots(model, out_dir):
         pylab.plot(model.times, soln, label=var_key)
     pylab.legend()
     pylab.savefig(os.path.join(out_dir, 'fraction.png'))
-
-
-def show_pngs(out_dir):
-    """
-    Open the graphs created by the previous function.
-
-    Args:
-        out_dir: The directory to be opened, where the graphs are
-    """
-
-    pngs = glob.glob(os.path.join(out_dir, '*png'))
-    operating_system = platform.system()
-    if 'Windows' in operating_system:
-        os.system('start ' + ' '.join(pngs))
-    elif 'Darwin' in operating_system:
-        os.system('open ' + ' '.join(pngs))
 
 
 #################################
@@ -226,11 +198,13 @@ class SimpleTbModel(BaseModel):
 ##################
 
 if __name__ == '__main__':
-    # Run and graph a simple TB model with time-variant case detection rate,
-    # then run the same model with an intervention (BCG vaccination) applied.
+    """
+    Run and graph a simple TB model with time-variant case detection rate, then run the same model with an intervention
+    (BCG vaccination) applied.
 
-    # create a simple TB model without any interventions and a single scaling parameter for case detection rate
-    # (as shown in the instantiation of the TB model object)
+    Create a simple TB model without any interventions and a single scaling parameter for case detection rate
+    (as shown in the instantiation of the TB model object).
+    """
 
     time_treatment = .5
     fixed_parameters = {
@@ -256,10 +230,10 @@ if __name__ == '__main__':
 
     # graph outputs
     out_dir = 'tb_graphs'
-    ensure_dir(out_dir)
+    tool_kit.ensure_out_dir(out_dir)
     model.make_graph(os.path.join(out_dir, 'workflow'))
     make_plots(model, out_dir)
-    show_pngs(out_dir)
+    tool_kit.open_out_dir(out_dir)
 
     # add vaccination as an intervention to the same model as run and presented immediately above
     model = SimpleTbModel(fixed_parameters, ['vaccination'])
@@ -268,7 +242,7 @@ if __name__ == '__main__':
 
     # graph outputs
     out_dir = 'tb_vaccination_graphs'
-    ensure_dir(out_dir)
+    tool_kit.ensure_out_dir(out_dir)
     model.make_graph(os.path.join(out_dir, 'workflow'))
     make_plots(model, out_dir)
-    show_pngs(out_dir)
+    tool_kit.open_out_dir(out_dir)
