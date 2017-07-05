@@ -89,11 +89,13 @@ class SimpleTbModel(BaseModel):
         # make interventions list an attribute of the object
         self.interventions = interventions
 
-        # base compartments
+        # define all compartments, initialise as empty and then populate
+        model_compartments \
+            = ['susceptible', 'latent_early', 'latent_late', 'active', 'treatment_infect', 'treatment_noninfect']
+        for each_compartment in model_compartments:
+            self.set_compartment(each_compartment, 0.)
         self.set_compartment('susceptible', 1e6)
         self.set_compartment('active', 1.)
-        for compartment in ['latent_early', 'latent_late', 'treatment_infect', 'treatment_noninfect']:
-            self.set_compartment(compartment, 0.)
 
         # additional compartments needed for interventions
         if 'vaccination' in self.interventions:
