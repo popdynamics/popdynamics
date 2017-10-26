@@ -1,15 +1,10 @@
 
-import sys
-import platform
 import os
-import glob
-
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-from basepop import BaseModel, make_sigmoidal_curve, make_constant_function
+from basepop import BaseModel
 import tool_kit
 
 
-''' Static functions for graphing and managing files '''
+''' static functions for graphing and managing files '''
 
 
 def make_plots(model, out_dir):
@@ -29,15 +24,23 @@ def make_plots(model, out_dir):
         soln = model.get_var_soln(var_key)
         pylab.plot(model.times, soln, label=var_key)
     pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'fraction.png'))
+    pylab.savefig(os.path.join(out_dir, 'prevalence_time.png'))
+
+    # main epidemiological outputs
+    pylab.clf()
+    for var_key in ['population']:
+        soln = model.get_var_soln(var_key)
+        pylab.plot(model.times, soln, label=var_key)
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, 'population_time.png'))
 
 
-''' Define model object class '''
+''' define model object class '''
 
 
-class SimpleTbModel(BaseModel):
+class RmitTbModel(BaseModel):
     """
-    Initial TB model by James Trauer.
+    TB model by Isaac Mwangi.
     Nested inheritance from BaseModel, which applies to any infectious disease generally.
     """
 
@@ -61,6 +64,7 @@ class SimpleTbModel(BaseModel):
         # parameter processing
         self.set_param('f_phi', self.params['f'] * self.params['phi'])
         self.set_param('1-f_phi', 1. - self.params['f'] * self.params['phi'])
+        self.set_param('tau_alpha', self.params['tau'] + self.params['alpha'])
 
     def calculate_vars(self):
         """
@@ -69,7 +73,7 @@ class SimpleTbModel(BaseModel):
 
         # demographic
         self.vars['population'] = sum(self.compartments.values())
-        self.vars['lambda'] = self.params['demo_rate_birth'] * self.vars['population']
+        self.vars['lambda'] = self.params['mu'] * self.vars['population'] + self.params['d'] * self.compartments['I']
 
         # infection
         self.vars['beta_I'] = self.params['beta'] * self.compartments['I'] / self.vars['population']
@@ -83,7 +87,7 @@ class SimpleTbModel(BaseModel):
 
         # demographic
         self.set_var_entry_rate_flow('S', 'lambda')
-        self.set_background_death_rate('demo_rate_death')
+        self.set_background_death_rate('mu')
 
         # infection
         self.set_var_transfer_rate_flow('S', 'L1', 'beta_I')
@@ -96,17 +100,16 @@ class SimpleTbModel(BaseModel):
         self.set_fixed_transfer_rate_flow('L1', 'L2', '1-f_phi')
         self.set_fixed_transfer_rate_flow('L2', 'I', 'eta')
 
-        # recovery
-        self.set_fixed_transfer_rate_flow('I', 'R', 'program_rate_detect')
-
-
-        self.set_fixed_transfer_rate_flow('L2', 'P', 'rho')
+        # latent treatment
         self.set_fixed_transfer_rate_flow('L1', 'P', 'theta')
-        self.set_fixed_transfer_rate_flow('I', 'L2', 'tb_rate_recover')
-        self.set_infection_death_rate_flow('I', 'tb_rate_death')
+        self.set_fixed_transfer_rate_flow('L2', 'P', 'rho')
+
+        # recovery
+        self.set_fixed_transfer_rate_flow('I', 'R', 'tau_alpha')
+        self.set_infection_death_rate_flow('I', 'd')
+
+        # relapse
         self.set_fixed_transfer_rate_flow('R', 'I', 'omega')
-        self.set_fixed_transfer_rate_flow('R', 'S', 'program_rate_completion')
-        self.set_infection_death_rate_flow('R', 'program_rate_death')
 
     def calculate_diagnostic_vars(self):
         """
@@ -129,30 +132,24 @@ if __name__ == '__main__':
     (as shown in the instantiation of the TB model object).
     """
 
-    time_treatment = .5
     fixed_parameters = {
-        'demo_rate_birth': 20. / 1e3,
-        'demo_rate_death': 1. / 65,
-        'f': .1,
-        'theta': 0.,
         'beta': 40.,
-        'tb_rate_earlyprogress': .1 / .5,
-        'eta': .1 / 100.,
-        'tb_rate_stabilise': .9 / .5,
-        'tb_rate_recover': .6 / 3.,
-        'tb_rate_death': .4 / 3.,
-        'program_rate_completion': .9 / time_treatment,
-        'omega': .05 / time_treatment,
-        'program_rate_death': .05 / time_treatment,
+        'mu': 1. / 70.,
+        'd': .1,
+        'phi': 12.,
+        'f': .1,
+        'eta': 2e-4,
+        'tau': 1. / 2.,
+        'alpha': 2. / 9.,
+        'theta': 0.,
         'rho': 0.,
+        'omega': 2e-5,
         'sigma1': .25,
-        'sigma2': .25,
-        'sigma3': .25,
-        'program_rate_detect': .7,
-        'phi': 12.
+        'sigma2': .5,
+        'sigma3': .5
     }
 
-    model = SimpleTbModel(fixed_parameters)
+    model = RmitTbModel(fixed_parameters)
     model.make_times(1950, 2000, .05)
     model.integrate(method='explicit')
 
