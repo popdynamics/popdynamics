@@ -1,41 +1,9 @@
 
 import os
 from basepop import BaseModel
+import numpy
+import pylab
 import tool_kit
-
-
-''' static functions for graphing and managing files '''
-
-
-def make_plots(model, out_dir):
-    """
-    Make some basic graphs of the scaling time-variant parameters and the basic model outputs.
-
-    Args:
-        model: Instance of the model object to be interrogated
-        out_dir: The directory to put the graphs in
-    """
-
-    import pylab
-
-    # main epidemiological outputs
-    pylab.clf()
-    for var_key in ['prevalence']:
-        soln = model.get_var_soln(var_key)
-        pylab.plot(model.times, soln, label=var_key)
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'prevalence_time.png'))
-
-    # main epidemiological outputs
-    pylab.clf()
-    for var_key in ['population']:
-        soln = model.get_var_soln(var_key)
-        pylab.plot(model.times, soln, label=var_key)
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'population_time.png'))
-
-
-''' define model object class '''
 
 
 class RmitTbModel(BaseModel):
@@ -45,18 +13,13 @@ class RmitTbModel(BaseModel):
     """
 
     def __init__(self, parameters):
-        """
-        Inputs:
-            interventions: List of interventions to be simulated in the run of the model
-        """
-
         BaseModel.__init__(self)
 
         # define all compartments, initialise as empty and then populate
         model_compartments = ['S', 'L1', 'L2', 'P', 'I', 'R']
         for each_compartment in model_compartments: self.set_compartment(each_compartment, 0.)
-        self.set_compartment('S', 1e6)
-        self.set_compartment('I', 1.)
+        self.set_compartment('S', 1.)
+        self.set_compartment('I', 1e-3)
 
         # parameter setting
         for parameter, value in parameters.items(): self.set_param(parameter, value)
@@ -68,7 +31,7 @@ class RmitTbModel(BaseModel):
 
     def calculate_vars(self):
         """
-        Calculate values that change with time over the course of model integration.
+        Calculate values that change with time over the course of model integration - only forces of infection.
         """
 
         # demographic
@@ -116,47 +79,49 @@ class RmitTbModel(BaseModel):
         Calculate output variables from model quantities.
         """
 
-        # main epidemiological indicators
-        self.vars['prevalence'] = self.compartments['I'] / self.vars['population'] * 1e5
+        self.vars['proportion'] = self.compartments['I'] / self.vars['population']
 
 
-''' Run models '''
+''' Run model '''
 
 
 if __name__ == '__main__':
-    """
-    Run and graph a simple TB model with time-variant case detection rate, then run the same model with an intervention
-    (BCG vaccination) applied.
-
-    Create a simple TB model without any interventions and a single scaling parameter for case detection rate
-    (as shown in the instantiation of the TB model object).
-    """
-
     fixed_parameters = {
-        'beta': 40.,
         'mu': 1. / 70.,
         'd': .1,
-        'phi': 12.,
-        'f': .1,
+        'phi': 1.5,  # not sure whether 1.5 or 12 or value in between?
+        'f': .05,  # not sure whether 0.05 or 0.1?
         'eta': 2e-4,
         'tau': 1. / 2.,
         'alpha': 2. / 9.,
-        'theta': 0.,
+        'theta': 1.,  # not sure whether 0. or 1.?
         'rho': 0.,
         'omega': 2e-5,
-        'sigma1': .25,
-        'sigma2': .5,
-        'sigma3': .5
+        'sigma1': 0.,
+        'sigma2': 0.,
+        'sigma3': 0.
     }
 
-    model = RmitTbModel(fixed_parameters)
-    model.make_times(1950, 2000, .05)
-    model.integrate(method='explicit')
-
-    # graph outputs
+    # figure 2
+    betas = list(numpy.linspace(1., 99., 99))
+    betas += list(numpy.linspace(100., 500., 51))
+    proportions = []
+    for beta in betas:
+        model = RmitTbModel(fixed_parameters)
+        model.set_param('beta', float(beta))
+        model.make_times(0, 500., 1.)
+        model.integrate(method='explicit')
+        proportions.append(model.vars['proportion'])
     out_dir = 'tb_graphs'
-    tool_kit.ensure_out_dir(out_dir)
-    model.make_graph(os.path.join(out_dir, 'workflow'))
-    make_plots(model, out_dir)
+    print(betas)
+    pylab.clf()
+    pylab.semilogy(betas, proportions)
+    pylab.text(400., 1e-2, r'$\sigma_1$=0' + '\n' + r'$\sigma_2$=0' + '\n' + r'$\sigma_3$=0')
+    pylab.ylabel('proportion of infectives, I')
+    pylab.xlabel(r'transmission coefficient, $\beta$')
+    pylab.ylim([9e-7, 1.])
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, 'proportion_beta.png'))
     tool_kit.open_out_dir(out_dir)
+
 
