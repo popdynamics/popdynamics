@@ -113,7 +113,6 @@ if __name__ == '__main__':
         model.integrate(method='explicit')
         proportions.append(model.vars['proportion'])
     out_dir = 'tb_graphs'
-    print(betas)
     pylab.clf()
     pylab.semilogy(betas, proportions)
     pylab.text(400., 1e-2, r'$\sigma_1$=0' + '\n' + r'$\sigma_2$=0' + '\n' + r'$\sigma_3$=0')
@@ -121,7 +120,29 @@ if __name__ == '__main__':
     pylab.xlabel(r'transmission coefficient, $\beta$')
     pylab.ylim([9e-7, 1.])
     pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'proportion_beta.png'))
-    tool_kit.open_out_dir(out_dir)
+    pylab.savefig(os.path.join(out_dir, 'figure_2.png'))
 
+    # figure 8b
+    pylab.clf()
+    fixed_parameters['sigma1'] = 0.25
+    fixed_parameters['sigma2'] = 0.5
+    fixed_parameters['sigma3'] = 0.5
+    fixed_parameters['tau'] = 2.
+    for rho in [0., 0.5, 1., 10, 1e2]:
+        proportions = []
+        for beta in betas:
+            model = RmitTbModel(fixed_parameters)
+            model.set_param('beta', float(beta))
+            model.set_param('rho', float(rho))
+            model.make_times(0, 500., 1.)
+            model.integrate(method='explicit')
+            proportions.append(model.vars['proportion'])
+        pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
+    pylab.text(400., 1e-4, r'$\sigma_1$=0.25' + '\n' + r'$\sigma_2$=0.5' + '\n' + r'$\sigma_3$=0.5')
+    pylab.ylabel('proportion of infectives, I')
+    pylab.xlabel(r'transmission coefficient, $\beta$')
+    pylab.ylim([9e-7, 1.])
+    pylab.legend(frameon=False, loc=8)
+    pylab.savefig(os.path.join(out_dir, 'figure_8b.png'))
+    tool_kit.open_out_dir(out_dir)
 
