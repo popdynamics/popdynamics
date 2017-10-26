@@ -63,7 +63,7 @@ class RmitTbModel(BaseModel):
 
         # parameter processing
         self.set_param('f_phi', self.params['f'] * self.params['phi'])
-        self.set_param('1-f_phi', 1. - self.params['f'] * self.params['phi'])
+        self.set_param('1-f_phi', (1. - self.params['f']) * self.params['phi'])
         self.set_param('tau_alpha', self.params['tau'] + self.params['alpha'])
 
     def calculate_vars(self):
