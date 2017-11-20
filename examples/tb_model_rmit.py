@@ -105,8 +105,8 @@ if __name__ == '__main__':
     fixed_parameters.update(sigmas_dict)
 
     # figure 2
-    betas = list(numpy.linspace(1., 99., 5))
-    betas += list(numpy.linspace(100., 500., 5))
+    betas = list(numpy.linspace(1., 99., 99))
+    betas += list(numpy.linspace(100., 500., 51))
     proportions = []
     for beta in betas:
         model = RmitTbModel(fixed_parameters)
