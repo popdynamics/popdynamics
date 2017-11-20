@@ -82,29 +82,31 @@ class RmitTbModel(BaseModel):
         self.vars['proportion'] = self.compartments['I'] / self.vars['population']
 
 
-''' Run model '''
+''' run model '''
 
 
 if __name__ == '__main__':
     fixed_parameters = {
         'mu': 1. / 70.,
         'd': .1,
-        'phi': 1.5,  # not sure whether 1.5 or 12 or value in between?
+        'phi': 12,  # not sure whether 1.5 or 12 or value in between?
         'f': .05,  # not sure whether 0.05 or 0.1?
         'eta': 2e-4,
         'tau': 1. / 2.,
         'alpha': 2. / 9.,
         'theta': 1.,  # not sure whether 0. or 1.?
-        'rho': 0.,
+        'rho': 0.1,
         'omega': 2e-5,
-        'sigma1': 0.,
-        'sigma2': 0.,
-        'sigma3': 0.
     }
+    sigmas = [0., 0., 0.]
+    sigmas_dict = {}
+    for sigma in range(len(sigmas)):
+        sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
+    fixed_parameters.update(sigmas_dict)
 
     # figure 2
-    betas = list(numpy.linspace(1., 99., 99))
-    betas += list(numpy.linspace(100., 500., 51))
+    betas = list(numpy.linspace(1., 99., 5))
+    betas += list(numpy.linspace(100., 500., 5))
     proportions = []
     for beta in betas:
         model = RmitTbModel(fixed_parameters)
@@ -115,7 +117,10 @@ if __name__ == '__main__':
     out_dir = 'tb_graphs'
     pylab.clf()
     pylab.semilogy(betas, proportions)
-    pylab.text(400., 1e-2, r'$\sigma_1$=0' + '\n' + r'$\sigma_2$=0' + '\n' + r'$\sigma_3$=0')
+    text = r''
+    for sigma in range(len(sigmas)):
+        text += r'$\sigma_' + str(sigma + 1) + '$=%.0f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+    pylab.text(400., 1e-2, text)
     pylab.ylabel('proportion of infectives, I')
     pylab.xlabel(r'transmission coefficient, $\beta$')
     pylab.ylim([9e-7, 1.])
@@ -124,11 +129,13 @@ if __name__ == '__main__':
 
     # figure 8b
     pylab.clf()
-    fixed_parameters['sigma1'] = 0.25
-    fixed_parameters['sigma2'] = 0.5
-    fixed_parameters['sigma3'] = 0.5
+    sigmas = [0.25, 0.5, 0.5]
+    sigmas_dict = {}
+    for sigma in range(len(sigmas)):
+        sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
+    fixed_parameters.update(sigmas_dict)
     fixed_parameters['tau'] = 2.
-    for rho in [0., 0.5, 1., 10, 1e2]:
+    for rho in [0., 0.5, 1., 10.]:
         proportions = []
         for beta in betas:
             model = RmitTbModel(fixed_parameters)
@@ -138,7 +145,10 @@ if __name__ == '__main__':
             model.integrate(method='explicit')
             proportions.append(model.vars['proportion'])
         pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
-    pylab.text(400., 1e-4, r'$\sigma_1$=0.25' + '\n' + r'$\sigma_2$=0.5' + '\n' + r'$\sigma_3$=0.5')
+    text = r''
+    for sigma in range(len(sigmas)):
+        text += r'$\sigma_' + str(sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+    pylab.text(400., 1e-4, text)
     pylab.ylabel('proportion of infectives, I')
     pylab.xlabel(r'transmission coefficient, $\beta$')
     pylab.ylim([9e-7, 1.])
