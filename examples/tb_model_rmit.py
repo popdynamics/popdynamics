@@ -89,12 +89,12 @@ if __name__ == '__main__':
     fixed_parameters = {
         'mu': 1. / 70.,
         'd': .1,
-        'phi': 12,  # not sure whether 1.5 or 12 or value in between?
-        'f': .05,  # not sure whether 0.05 or 0.1?
+        'phi': 12,
+        'f': .05,  # not sure whether 0.05 or 0.5?
         'eta': 2e-4,
         'tau': 1. / 2.,
         'alpha': 2. / 9.,
-        'theta': 1.,  # not sure whether 0. or 1.?
+        'theta': 1.,
         'rho': 0.1,
         'omega': 2e-5,
     }
