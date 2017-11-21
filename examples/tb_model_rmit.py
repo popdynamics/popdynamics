@@ -127,32 +127,34 @@ if __name__ == '__main__':
     pylab.legend()
     pylab.savefig(os.path.join(out_dir, 'figure_2.png'))
 
-    # figure 8b
-    pylab.clf()
-    sigmas = [0.25, 0.5, 0.5]
-    sigmas_dict = {}
-    for sigma in range(len(sigmas)):
-        sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
-    fixed_parameters.update(sigmas_dict)
-    fixed_parameters['tau'] = 2.
-    for rho in [0., 0.5, 1., 10.]:
-        proportions = []
-        for beta in betas:
-            model = RmitTbModel(fixed_parameters)
-            model.set_param('beta', float(beta))
-            model.set_param('rho', float(rho))
-            model.make_times(0, 500., 1.)
-            model.integrate(method='explicit')
-            proportions.append(model.vars['proportion'])
-        pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
-    text = r''
-    for sigma in range(len(sigmas)):
-        text += r'$\sigma_' + str(sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(sigma + 1)]
-    pylab.text(400., 1e-4, text)
-    pylab.ylabel('proportion of infectives, I')
-    pylab.xlabel(r'transmission coefficient, $\beta$')
-    pylab.ylim([9e-7, 1.])
-    pylab.legend(frameon=False, loc=8)
-    pylab.savefig(os.path.join(out_dir, 'figure_8b.png'))
-    tool_kit.open_out_dir(out_dir)
+    # figure 8
+    sets_of_sigmas = {'a': [0.25, 0.125, 0.125], 'b': [0.25, 0.5, 0.5]}
+    for fig_letter in sets_of_sigmas:
+        pylab.clf()
+        sigmas = sets_of_sigmas[fig_letter]
+        sigmas_dict = {}
+        for sigma in range(len(sigmas)):
+            sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
+        fixed_parameters.update(sigmas_dict)
+        fixed_parameters['tau'] = 2.
+        for rho in [0., 0.5, 1., 10.]:
+            proportions = []
+            for beta in betas:
+                model = RmitTbModel(fixed_parameters)
+                model.set_param('beta', float(beta))
+                model.set_param('rho', float(rho))
+                model.make_times(0, 500., 1.)
+                model.integrate(method='explicit')
+                proportions.append(model.vars['proportion'])
+            pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
+        text = r''
+        for sigma in range(len(sigmas)):
+            text += r'$\sigma_' + str(sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+        pylab.text(400., 1e-4, text)
+        pylab.ylabel('proportion of infectives, I')
+        pylab.xlabel(r'transmission coefficient, $\beta$')
+        pylab.ylim([9e-7, 1.])
+        pylab.legend(frameon=False, loc=8)
+        pylab.savefig(os.path.join(out_dir, 'figure_8' + fig_letter + '.png'))
+        tool_kit.open_out_dir(out_dir)
 
