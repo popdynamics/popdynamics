@@ -6,6 +6,8 @@ import glob
 
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 from basepop import BaseModel, make_sigmoidal_curve
+import tool_kit
+
 
 """
 This file presents a transmission dynamic model for TB based on those most commonly used by the AuTuMN team
@@ -37,20 +39,6 @@ Suggestion to get started:
 ### Static functions for graphing and managing files ###
 ########################################################
 
-def ensure_dir(out_dir):
-    """
-    Make sure the output directory exists.
-
-    Args:
-        out_dir: String for the output directory name
-    """
-
-    try: 
-        os.makedirs(out_dir)
-    except OSError:
-        if not os.path.isdir(out_dir):
-            raise
-
 
 def make_plots(model, out_dir):
     """
@@ -80,22 +68,6 @@ def make_plots(model, out_dir):
     pylab.savefig(os.path.join(out_dir, 'fraction.png'))
 
 
-def show_pngs(out_dir):
-    """
-    Open the graphs created by the previous function.
-
-    Args:
-        out_dir: The directory to be opened, where the graphs are
-    """
-
-    pngs = glob.glob(os.path.join(out_dir, '*png'))
-    operating_system = platform.system()
-    if 'Windows' in operating_system:
-        os.system('start ' + ' '.join(pngs))
-    elif 'Darwin' in operating_system:
-        os.system('open ' + ' '.join(pngs))
-
-
 #################################
 ### Define model object class ###
 #################################
@@ -106,7 +78,7 @@ class SimpleTbModel(BaseModel):
     Nested inheritance from BaseModel, which applies to any infectious disease generally.
     """
 
-    def __init__(self, interventions=[]):
+    def __init__(self, fixed_parameters, interventions=[]):
         """
         Inputs:
             interventions: List of interventions to be simulated in the run of the model
@@ -117,39 +89,21 @@ class SimpleTbModel(BaseModel):
         # make interventions list an attribute of the object
         self.interventions = interventions
 
-        # base compartments
+        # define all compartments, initialise as empty and then populate
+        model_compartments \
+            = ['susceptible', 'latent_early', 'latent_late', 'active', 'treatment_infect', 'treatment_noninfect']
+        for each_compartment in model_compartments:
+            self.set_compartment(each_compartment, 0.)
         self.set_compartment('susceptible', 1e6)
-        self.set_compartment('latent_early', 0.)
-        self.set_compartment('latent_late', 0.)
         self.set_compartment('active', 1.)
-        self.set_compartment('treatment_infect', 0.)
-        self.set_compartment('treatment_noninfect', 0.)
 
         # additional compartments needed for interventions
         if 'vaccination' in self.interventions:
             self.set_compartment('susceptible_vaccinated', 0.)
 
-        # demographic parameters
-        self.set_param('demo_rate_birth', 20. / 1e3)
-        self.set_param('demo_rate_death', 1. / 65)
-
-        # disease-specific parameters
-        self.set_param('tb_n_contact', 40.)
-        self.set_param('tb_rate_earlyprogress', .1 / .5)
-        self.set_param('tb_rate_lateprogress', .1 / 100.)
-        self.set_param('tb_rate_stabilise', .9 / .5)
-        self.set_param('tb_rate_recover', .6 / 3.)
-        self.set_param('tb_rate_death', .4 / 3.)
-
-        # programmatic parameters
-        time_treatment = .5
-        self.set_param('program_time_treatment', time_treatment)
-        self.set_param('program_rate_completion_infect', .9 / time_treatment)
-        self.set_param('program_rate_default_infect', .05 / time_treatment)
-        self.set_param('program_rate_death_infect', .05 / time_treatment)
-        self.set_param('program_rate_completion_noninfect', .9 / time_treatment)
-        self.set_param('program_rate_default_noninfect', .05 / time_treatment)
-        self.set_param('program_rate_death_noninfect', .05 / time_treatment)
+        # parameter setting
+        for parameter, value in fixed_parameters.items():
+            self.set_param(parameter, value)
 
         # example of a scaling parameter (case detection rate)
         curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
@@ -246,30 +200,51 @@ class SimpleTbModel(BaseModel):
 ##################
 
 if __name__ == '__main__':
-    # Run and graph a simple TB model with time-variant case detection rate,
-    # then run the same model with an intervention (BCG vaccination) applied.
+    """
+    Run and graph a simple TB model with time-variant case detection rate, then run the same model with an intervention
+    (BCG vaccination) applied.
 
-    # create a simple TB model without any interventions and a single scaling parameter for case detection rate
-    # (as shown in the instantiation of the TB model object)
-    model = SimpleTbModel()
+    Create a simple TB model without any interventions and a single scaling parameter for case detection rate
+    (as shown in the instantiation of the TB model object).
+    """
+
+    time_treatment = .5
+    fixed_parameters = {
+        'demo_rate_birth': 20. / 1e3,
+        'demo_rate_death': 1. / 65,
+        'tb_n_contact': 40.,
+        'tb_rate_earlyprogress': .1 / .5,
+        'tb_rate_lateprogress': .1 / 100.,
+        'tb_rate_stabilise': .9 / .5,
+        'tb_rate_recover': .6 / 3.,
+        'tb_rate_death': .4 / 3.,
+        'program_rate_completion_infect': .9 / time_treatment,
+        'program_rate_default_infect': .05 / time_treatment,
+        'program_rate_death_infect': .05 / time_treatment,
+        'program_rate_completion_noninfect': .9 / time_treatment,
+        'program_rate_default_noninfect': .05 / time_treatment,
+        'program_rate_death_noninfect': .05 / time_treatment
+    }
+
+    model = SimpleTbModel(fixed_parameters)
     model.make_times(1900, 2050, .05)
     model.integrate(method='explicit')
 
     # graph outputs
     out_dir = 'tb_graphs'
-    ensure_dir(out_dir)
+    tool_kit.ensure_out_dir(out_dir)
     model.make_graph(os.path.join(out_dir, 'workflow'))
     make_plots(model, out_dir)
-    show_pngs(out_dir)
+    tool_kit.open_out_dir(out_dir)
 
     # add vaccination as an intervention to the same model as run and presented immediately above
-    model = SimpleTbModel(['vaccination'])
+    model = SimpleTbModel(fixed_parameters, ['vaccination'])
     model.make_times(1900, 2050, .05)
     model.integrate(method='explicit')
 
     # graph outputs
     out_dir = 'tb_vaccination_graphs'
-    ensure_dir(out_dir)
+    tool_kit.ensure_out_dir(out_dir)
     model.make_graph(os.path.join(out_dir, 'workflow'))
     make_plots(model, out_dir)
-    show_pngs(out_dir)
+    tool_kit.open_out_dir(out_dir)

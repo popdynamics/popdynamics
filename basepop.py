@@ -12,6 +12,10 @@ import random
 from scipy.integrate import odeint
 import numpy
 
+"""
+First section contains general, static methods for use by BaseModel object in creating any epidemiological model object.
+"""
+
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """
@@ -82,8 +86,15 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
     return curve
 
 
-def make_two_step_curve(
-    y_low, y_med, y_high, x_start, x_med, x_end):
+def make_constant_function(value):
+
+    def curve(x):
+        return value
+
+    return curve
+
+
+def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
 
     curve1 = make_sigmoidal_curve(
         y_high=y_med, y_low=y_low,
