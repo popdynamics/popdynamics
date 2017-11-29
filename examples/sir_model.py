@@ -262,7 +262,8 @@ measles_params = {
 model = SirModel(measles_params)
 model.make_times(0, 100, 1)
 # model.integrate("explicit")
-model.integrate_continuous_stochastic()
+# model.integrate_continuous_stochastic()
+model.integrate_discrete_time_stochastic()
 
 # example graph generation
 generate_output(model, "measles")

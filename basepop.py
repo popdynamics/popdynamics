@@ -663,6 +663,75 @@ class BaseModel:
 
         self.calculate_diagnostics()
 
+    def integrate_discrete_time_stochastic(self, dt=0.1):
+        """
+        Run a continuous stochastic simulation. This uses the Gillespie algoirthm
+        to simpulate events
+        """
+
+        self.init_run()
+
+        assert self.times is not None, 'Haven\'t set times yet'
+
+        y = self.get_init_list()
+        self.compartments = self.convert_list_to_compartments(y)
+
+        n_compartment = len(y)
+        n_time = len(self.times)
+        self.soln_array = numpy.zeros((n_time, n_compartment))
+
+        time = self.times[0]
+        self.soln_array[0, :] = y
+        for i_time, new_time in enumerate(self.times):
+
+            n_sample = 0
+
+            while time < new_time:
+
+                self.time = time
+
+                self.calculate_vars()
+
+                self.calculate_events()
+
+                for event in self.events:
+                    from_label, to_label, rate = event
+
+                    mean = rate * dt
+                    delta_population = numpy.random.poisson(mean, 1)[0]
+                    print '%11s-%11s %.3f %.3f %.3f %d' % (
+                        event[0], event[1], event[2], dt, mean, delta_population)
+
+                    if from_label and to_label:
+                        if delta_population > self.compartments[from_label]:
+                            delta_population = self.compartments[from_label]
+                        self.compartments[from_label] -= delta_population
+                        self.compartments[to_label] += delta_population
+                    elif to_label is None:
+                        # death
+                        if delta_population > self.compartments[from_label]:
+                            delta_population = self.compartments[from_label]
+                        self.compartments[from_label] -= delta_population
+                    elif from_label is None:
+                        # birth
+                        self.compartments[to_label] += delta_population
+
+                self.checks()
+
+                time += dt
+
+                n_sample += 1
+
+            else:
+                print "time:%.1f samples:%d" % (time, n_sample)
+
+            if i_time < n_time - 1:
+                y = self.convert_compartments_to_list(self.compartments)
+                self.soln_array[i_time + 1, :] = y
+
+        self.calculate_diagnostics()
+
+
     def calculate_diagnostic_vars(self):
         """
         Calculate diagnostic vars that can depend on self.flows as well as self.vars calculated in calculate_vars
