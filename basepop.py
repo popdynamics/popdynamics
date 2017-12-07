@@ -118,6 +118,20 @@ def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
     return curve
 
 
+def pick_event(event_intervals):
+    i_event = 0
+    cumul_intervals = []
+    cumul_interval = 0.0
+    for interval in event_intervals:
+        cumul_interval += interval
+        cumul_intervals.append(cumul_interval)
+    i = random.random() * cumul_interval
+    i_last_event = len(event_intervals) - 1
+    while i > cumul_intervals[i_event] and i_event < i_last_event:
+        i_event += 1
+    return i_event
+
+
 class BaseModel:
     """
     Basic concepts
@@ -139,6 +153,7 @@ class BaseModel:
 
         # stored list of time points
         self.times = None
+        self.time = 0
 
         # scale-up functions, generally used for time-variant parameters,
         # whose values change in a way that is predictable before the model has been run
@@ -241,7 +256,7 @@ class BaseModel:
         """
 
         assert type(label) is str, 'Compartment label for initial setting not string'
-        assert type(init_val) is float, 'Value to start % compartment from not string' % label
+        assert type(init_val) is float or type(init_val) is int, 'Value to start % compartment from not string' % label
         assert init_val >= 0., 'Start with negative compartment not permitted'
         if label not in self.labels:
             self.labels.append(label)
@@ -586,8 +601,8 @@ class BaseModel:
 
     def integrate_continuous_stochastic(self):
         """
-        Run a continuous stochastic simulation. This uses the Gillespie algoirthm
-        to simpulate events
+        Run a continuous stochastic simulation. This uses the Gillespie algorithm
+        to simulate events
         """
 
         self.init_run()
@@ -603,70 +618,48 @@ class BaseModel:
 
         time = self.times[0]
         self.soln_array[0, :] = y
+        n_sample = 0
         for i_time, new_time in enumerate(self.times):
 
-            n_sample = 0
-
             while time < new_time:
-
                 self.time = time
-
                 self.calculate_vars()
-
                 self.calculate_events()
 
-                n_event = len(self.events)
+                event_rates = [event[2] for event in self.events]
+                i_event = pick_event(event_rates)
 
-                if n_event > 0:
+                total_rate = sum(event_rates)
+                dt = - math.log(random.random()) / total_rate
 
-                    total_rate = sum([event[2] for event in self.events])
-                    p = random.random()
-                    dt = - math.log(p) / total_rate
-
-                    # pick an event at random
-                    i_event = 0
-                    probs = [event[2] / total_rate for event in self.events]
-                    cumul_probs = []
-                    cumul_prob = 0.0
-                    for i in range(len(probs)):
-                        cumul_prob += probs[i]
-                        cumul_probs.append(cumul_prob)
-                    p = random.random()
-                    i_last_event = n_event - 1
-                    while p > cumul_probs[i_event] and i_event < i_last_event:
-                        i_event += 1
-
-                    from_label, to_label, rate = self.events[i_event]
-
-                    if from_label and to_label:
-                        self.compartments[from_label] -= 1
-                        self.compartments[to_label] += 1
-                    elif to_label is None:
-                        # death
-                        self.compartments[from_label] -= 1
-                    elif from_label is None:
-                        # birth
-                        self.compartments[to_label] += 1
+                from_label, to_label, rate = self.events[i_event]
+                if from_label and to_label:
+                    self.compartments[from_label] -= 1
+                    self.compartments[to_label] += 1
+                elif to_label is None:
+                    # death
+                    self.compartments[from_label] -= 1
+                elif from_label is None:
+                    # birth
+                    self.compartments[to_label] += 1
 
                 self.checks()
-
                 time += dt
-
                 n_sample += 1
-
-            else:
-                print "time:%.1f samples:%d" % (time, n_sample)
 
             if i_time < n_time - 1:
                 y = self.convert_compartments_to_list(self.compartments)
                 self.soln_array[i_time + 1, :] = y
 
+        print("integrate_continuous_stochastic time:%d events:%d" % (time, n_sample))
+
         self.calculate_diagnostics()
 
-    def integrate_discrete_time_stochastic(self, dt=0.1):
+    def integrate_discrete_time_stochastic(self, dt=1):
         """
-        Run a continuous stochastic simulation. This uses the Gillespie algoirthm
-        to simpulate events
+        Run a continuous stochastic simulation. This uses the Tau-leaping
+        extension to the Gillespie algorithm, with a Poisson estimator
+        to estimate multiple events in a time-interval.
         """
 
         self.init_run()
@@ -684,14 +677,10 @@ class BaseModel:
         self.soln_array[0, :] = y
         for i_time, new_time in enumerate(self.times):
 
-            n_sample = 0
-
             while time < new_time:
 
                 self.time = time
-
                 self.calculate_vars()
-
                 self.calculate_events()
 
                 for event in self.events:
@@ -699,8 +688,6 @@ class BaseModel:
 
                     mean = rate * dt
                     delta_population = numpy.random.poisson(mean, 1)[0]
-                    print '%11s-%11s %.3f %.3f %.3f %d' % (
-                        event[0], event[1], event[2], dt, mean, delta_population)
 
                     if from_label and to_label:
                         if delta_population > self.compartments[from_label]:
@@ -719,11 +706,6 @@ class BaseModel:
                 self.checks()
 
                 time += dt
-
-                n_sample += 1
-
-            else:
-                print "time:%.1f samples:%d" % (time, n_sample)
 
             if i_time < n_time - 1:
                 y = self.convert_compartments_to_list(self.compartments)
