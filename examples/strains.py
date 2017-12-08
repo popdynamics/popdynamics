@@ -1,7 +1,10 @@
 """
 
+Michael Meehan's competitive-strain SIR model.
 
+@author: Bosco Ho, December 2017
 """
+
 from __future__ import print_function
 import platform
 import os
@@ -22,6 +25,10 @@ class StrainsModel(BaseModel):
     """
     Michael Meehan's competitive strain models SIR model.
 
+    There are two infection strains - resident and invader.
+    They have different r0 - r0_resident and r0_invader.
+    The model starts off with 1 invader with a more effective r0.
+
     :param input_params = {
         "r0_resident": 2,
         "r0_invader": 3,
@@ -32,8 +39,11 @@ class StrainsModel(BaseModel):
     }
     """
 
-    def __init__(self, input_params={}):
+    def __init__(self, input_params=None):
         BaseModel.__init__(self)
+
+        if input_params is None:
+            input_params = {}
 
         default_params = {
             "r0_resident": 2,
@@ -43,6 +53,7 @@ class StrainsModel(BaseModel):
             "rate_recover": 1.0e-2,  # a
             "rate_infection_death": 0,  # phi
         }
+
         for key, value in default_params.items():
             if key not in input_params:
                 input_params[key] = value
@@ -149,23 +160,59 @@ class StrainsModel(BaseModel):
                 self.vars["prevalence"] += val / self.vars["population"]
 
 
-n_sim = 200
+# Run replicas of the model
+
+n_replica = 200
 models = []
-for i_sim in range(n_sim):
+for i_sim in range(n_replica):
     if i_sim % 10 == 0:
         print("Processed", i_sim, "replicas")
     model = StrainsModel()
     model.make_times(0, 1000, 1)
     # model.integrate("explicit")
     model.integrate_continuous_stochastic()
-    model.integrate_discrete_time_stochastic()
+    # model.integrate_discrete_time_stochastic()
     models.append(model)
 
+
+# Set output directory
 
 infection = "strains"
 out_dir = infection + "_sir_graphs"
 if not os.path.isdir(out_dir):
     os.makedirs(out_dir)
+
+
+# Create probability of extinction graph
+
+extinction = []
+for model in models:
+    invader_soln = model.get_compartment_soln("infectious_invader")
+    is_extinct_invader = invader_soln[-1] == 0
+    extinction.append(is_extinct_invader)
+
+params = models[0].params
+asymptotic_prob_extinction = 1.0 * params["r0_resident"] / params["r0_invader"]
+
+pylab.clf()
+
+prob_extinction = []
+n_replica_range = range(1, n_replica)
+for n_replica in n_replica_range:
+    n_extinct = extinction[:n_replica].count(True)
+    prob_extinction.append(1.0 * n_extinct / n_replica)
+
+pylab.plot(n_replica_range, prob_extinction)
+
+pylab.ylabel("Probability of invader extinction")
+pylab.ylim([0, max(prob_extinction)*1.1])
+pylab.xlabel("Number of replicas run")
+pylab.title("Comparing to r0_resident/r0_invader = %.3f" % asymptotic_prob_extinction)
+
+pylab.savefig(os.path.join(out_dir, "extinction.png"))
+
+
+# Create population overlay graphs
 
 pylab.clf()
 y_max = 0
@@ -186,14 +233,21 @@ for i_model, model in enumerate(models):
             pylab.plot([0], [0], label=compartment, color=color[:3])
         pylab.plot(model.times, soln, linewidth=2, color=color)
         y_max = max(soln.max(), y_max)
+
 pylab.ylim([0, y_max*1.1])
 pylab.legend()
 pylab.ylabel("persons")
 pylab.title("Populations")
+
 pylab.savefig(os.path.join(out_dir, "compartment_sizes.png"))
 
-# create the flow diagram of the model
+
+# Create the flow diagram of the model
+
 models[0].make_graph(os.path.join(out_dir, "flow_diagram"))
+
+
+# Open output images for convenience
 
 pngs = glob.glob(os.path.join(out_dir, "*png"))
 operating_system = platform.system()

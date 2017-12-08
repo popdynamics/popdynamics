@@ -857,20 +857,22 @@ class BaseModel:
 
         styles = {
             'graph': {
-                'label': 'Dynamic Transmission Model',
-                'fontsize': '16',
+                'fontsize': '14',
+                'fontname': 'Helvetica',
+                'pad': '0.2',
             },
             'nodes': {
                 'fontname': 'Helvetica',
                 'shape': 'box',
-                'style': 'filled',
-                'fillcolor': '#CCDDFF',
+                'style': 'filled, rounded',
+                'fillcolor': '#DDEEFF',
+                'color': '#AABBDD'
             },
             'edges': {
                 'style': 'dotted',
                 'arrowhead': 'open',
-                'fontname': 'Courier',
-                'fontsize': '10',
+                'fontname': 'Helvetica',
+                'fontsize': '8',
             }
         }
 
@@ -889,26 +891,6 @@ class BaseModel:
         def num_str(f):
 
             return '%.3g' % f
-
-            # alternative code to uncomment if you prefer more natural language, rather than scientific notation
-            # abs_f = abs(f)
-            # if abs_f > 1e9:
-            #     return '%.1f billion' % (f / 1e9)
-            # if abs_f > 1e6:
-            #     return '%.1f million' % (f / 1e6)
-            # if abs_f > 1e3:
-            #     return '%.1f thousand' % (f / 1e3)
-            # if abs_f > 1e2:
-            #     return '%.0f' % f
-            # if abs_f > 0.5:
-            #     return '%.1f' % f
-            # if abs_f > 5e-2:
-            #     return '%.2f' % f
-            # if abs_f > 5e-4:
-            #     return '%.4f' % f
-            # if abs_f > 5e-6:
-            #     return '%.6f' % f
-            # return str(f)
 
         self.graph = Digraph(format='png')
         for label in self.labels:
