@@ -127,6 +127,7 @@ class BaseModel:
 
         # list of labels for all compartments
         self.labels = []
+        self.compartments = {}
 
         # stores the initial value for all compartments
         self.init_compartments = {}

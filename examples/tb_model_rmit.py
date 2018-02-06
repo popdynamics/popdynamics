@@ -17,12 +17,14 @@ class RmitTbModel(BaseModel):
 
         # define all compartments, initialise as empty and then populate
         model_compartments = ['S', 'L1', 'L2', 'P', 'I', 'R']
-        for each_compartment in model_compartments: self.set_compartment(each_compartment, 0.)
+        for each_compartment in model_compartments:
+            self.set_compartment(each_compartment, 0.)
         self.set_compartment('S', 1.)
         self.set_compartment('I', 1e-3)
 
         # parameter setting
-        for parameter, value in parameters.items(): self.set_param(parameter, value)
+        for parameter, value in parameters.items():
+            self.set_param(parameter, value)
 
         # parameter processing
         self.set_param('f_phi', self.params['f'] * self.params['phi'])
@@ -157,4 +159,3 @@ if __name__ == '__main__':
         pylab.legend(frameon=False, loc=8)
         pylab.savefig(os.path.join(out_dir, 'figure_8' + fig_letter + '.png'))
         tool_kit.open_out_dir(out_dir)
-
