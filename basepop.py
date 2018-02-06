@@ -6,9 +6,11 @@ Base Population Model to handle different type of models
 """
 
 import os
+import math
+import random
+
 from scipy.integrate import odeint
 import numpy
-from math import exp
 
 """
 First section contains general, static methods for use by BaseModel object in creating any epidemiological model object.
@@ -79,7 +81,7 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
         # check for large values that will blow out exp
         if arg > 10.:
             return y_low
-        return amplitude / (1. + exp(arg)) + y_low
+        return amplitude / (1. + math.exp(arg)) + y_low
 
     return curve
 
@@ -116,6 +118,20 @@ def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
     return curve
 
 
+def pick_event(event_intervals):
+    i_event = 0
+    cumul_intervals = []
+    cumul_interval = 0.0
+    for interval in event_intervals:
+        cumul_interval += interval
+        cumul_intervals.append(cumul_interval)
+    i = random.random() * cumul_interval
+    i_last_event = len(event_intervals) - 1
+    while i > cumul_intervals[i_event] and i_event < i_last_event:
+        i_event += 1
+    return i_event
+
+
 class BaseModel:
     """
     Basic concepts
@@ -138,10 +154,14 @@ class BaseModel:
 
         # stored list of time points
         self.times = None
+        self.time = 0
 
         # scale-up functions, generally used for time-variant parameters,
         # whose values change in a way that is predictable before the model has been run
         self.scaleup_fns = {}
+
+        # stores the population compartments in the model at a given time-point
+        self.compartments = {}
 
         # stores any auxillary variables used to calculate dynamic effects (such as transmission) at each time-step
         self.vars = {}
@@ -237,7 +257,7 @@ class BaseModel:
         """
 
         assert type(label) is str, 'Compartment label for initial setting not string'
-        assert type(init_val) is float, 'Value to start % compartment from not string' % label
+        assert type(init_val) is float or type(init_val) is int, 'Value to start % compartment from not string' % label
         assert init_val >= 0., 'Start with negative compartment not permitted'
         if label not in self.labels:
             self.labels.append(label)
@@ -532,6 +552,168 @@ class BaseModel:
                         y[i] = 0.
             if i_time < n_time - 1:
                 self.soln_array[i_time + 1, :] = y
+
+    def calculate_events(self):
+        """
+        Calculates self.events - list of possible stochastic events
+        where each event is a tuple (from_label, to_label, rate)
+
+        If an event is triggered then a single person
+        will be removed from self.compartments[from_label] to
+        self.compartments[to_label]
+
+        If from_label == None, this is an entry event
+        If to_label == None, this is an extinction event
+        """
+
+        self.events = []
+
+        # birth flows
+        for label, var_label in self.var_entry_rate_flow:
+            self.events.append((None, label, self.vars[var_label]))
+
+        # dynamic transmission flows
+        for from_label, to_label, var_label in self.var_transfer_rate_flows:
+            val = self.compartments[from_label] * self.vars[var_label]
+            if val > 0:
+                self.events.append((from_label, to_label, val))
+
+        # fixed-rate flows
+        for from_label, to_label, rate in self.fixed_transfer_rate_flows:
+            val = self.compartments[from_label] * rate
+            if val > 0:
+                self.events.append((from_label, to_label, val))
+
+        # background death flows
+        self.vars['rate_death'] = 0.
+        for label in self.labels:
+            val = self.compartments[label] * self.background_death_rate
+            if val > 0:
+                self.vars['rate_death'] += val
+                self.events.append((label, None, val))
+
+        # extra infection-related death flows
+        self.vars['rate_infection_death'] = 0.
+        for label, rate in self.infection_death_rate_flows:
+            val = self.compartments[label] * rate
+            if val > 0:
+                self.vars['rate_infection_death'] += val
+                self.events.append((label, None, val))
+
+    def integrate_continuous_stochastic(self):
+        """
+        Run a continuous stochastic simulation. This uses the Gillespie algorithm
+        to simulate events
+        """
+
+        self.init_run()
+
+        assert self.times is not None, 'Haven\'t set times yet'
+
+        y = self.get_init_list()
+        self.compartments = self.convert_list_to_compartments(y)
+
+        n_compartment = len(y)
+        n_time = len(self.times)
+        self.soln_array = numpy.zeros((n_time, n_compartment))
+
+        time = self.times[0]
+        self.soln_array[0, :] = y
+        n_sample = 0
+        for i_time, new_time in enumerate(self.times):
+
+            while time < new_time:
+                self.time = time
+                self.calculate_vars()
+                self.calculate_events()
+
+                event_rates = [event[2] for event in self.events]
+                i_event = pick_event(event_rates)
+
+                total_rate = sum(event_rates)
+                dt = - math.log(random.random()) / total_rate
+
+                from_label, to_label, rate = self.events[i_event]
+                if from_label and to_label:
+                    self.compartments[from_label] -= 1
+                    self.compartments[to_label] += 1
+                elif to_label is None:
+                    # death
+                    self.compartments[from_label] -= 1
+                elif from_label is None:
+                    # birth
+                    self.compartments[to_label] += 1
+
+                self.checks()
+                time += dt
+                n_sample += 1
+
+            if i_time < n_time - 1:
+                y = self.convert_compartments_to_list(self.compartments)
+                self.soln_array[i_time + 1, :] = y
+
+        print("integrate_continuous_stochastic time:%d events:%d" % (time, n_sample))
+
+        self.calculate_diagnostics()
+
+    def integrate_discrete_time_stochastic(self, dt=1):
+        """
+        Run a continuous stochastic simulation. This uses the Tau-leaping
+        extension to the Gillespie algorithm, with a Poisson estimator
+        to estimate multiple events in a time-interval.
+        """
+
+        self.init_run()
+
+        assert self.times is not None, 'Haven\'t set times yet'
+
+        y = self.get_init_list()
+        self.compartments = self.convert_list_to_compartments(y)
+
+        n_compartment = len(y)
+        n_time = len(self.times)
+        self.soln_array = numpy.zeros((n_time, n_compartment))
+
+        time = self.times[0]
+        self.soln_array[0, :] = y
+        for i_time, new_time in enumerate(self.times):
+
+            while time < new_time:
+
+                self.time = time
+                self.calculate_vars()
+                self.calculate_events()
+
+                for event in self.events:
+                    from_label, to_label, rate = event
+
+                    mean = rate * dt
+                    delta_population = numpy.random.poisson(mean, 1)[0]
+
+                    if from_label and to_label:
+                        if delta_population > self.compartments[from_label]:
+                            delta_population = self.compartments[from_label]
+                        self.compartments[from_label] -= delta_population
+                        self.compartments[to_label] += delta_population
+                    elif to_label is None:
+                        # death
+                        if delta_population > self.compartments[from_label]:
+                            delta_population = self.compartments[from_label]
+                        self.compartments[from_label] -= delta_population
+                    elif from_label is None:
+                        # birth
+                        self.compartments[to_label] += delta_population
+
+                self.checks()
+
+                time += dt
+
+            if i_time < n_time - 1:
+                y = self.convert_compartments_to_list(self.compartments)
+                self.soln_array[i_time + 1, :] = y
+
+        self.calculate_diagnostics()
+
 
     def calculate_diagnostic_vars(self):
         """

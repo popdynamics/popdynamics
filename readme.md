@@ -1,6 +1,6 @@
-# basepop
+# Popdynamics
 
-a library for flexible epidemiological modelling
+Popdynamics is a library for building epidemiological models. Popdynamics is designed to make it easy to build, and modify compartment models. As well, it provides options to switch between deterministic ODE solutions, and stochastic discrete-time and continuous-time models.
 
 # Why?
 
