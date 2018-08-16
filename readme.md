@@ -20,7 +20,7 @@ _1) Anaconda Python_
 
 Install the [Anaconda Python](https://www.anaconda.com/download/#macos) environment. This package already contains most of the dependencies required.
 
-To install graphviz:
+Optional: to install graphviz for flow diagrams:
 
 ```bash
 > conda install graphviz
@@ -40,7 +40,7 @@ If you have your own Python environment, you will have to install the dependenci
 > python setup.py develop
 ```
 
-If you want to auto-generate flow-charts, you will also have to download [Graphviz](https://graphviz.gitlab.io/download/), which is a binary to generate well-formated flow-charts. Popydnamics will skip flow-charts if Graphviz is not found.
+Optional. If you want to auto-generate flow-charts, you will also have to download [Graphviz](https://graphviz.gitlab.io/download/), which is a binary to generate well-formated flow-charts. Popydnamics will skip flow-charts if Graphviz is not found.
 
 Requirements: _python 2/3; numpy, scipy, matplotlib, graphviz (python), graphviz (binary)_
 
