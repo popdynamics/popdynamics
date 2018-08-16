@@ -655,6 +655,10 @@ class BaseModel(object):
                 self.calculate_vars()
                 self.calculate_events()
 
+                if len(self.events) == 0:
+                    print("No more changes, quit at time", time)
+                    break
+
                 event_rates = [event[2] for event in self.events]
                 i_event = pick_event(event_rates)
 

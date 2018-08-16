@@ -256,6 +256,7 @@ for params in [flu_params, measles_params]:
     model = SirModel(params)
     model.make_times(0, 100, 1)
     model.integrate()
+    # model.integrate_discrete_time_stochastic()
     generate_output(model, params["name"])
 
 
