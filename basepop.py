@@ -5,24 +5,56 @@
 Base Population Model to handle different type of models
 """
 
+from __future__ import print_function
 import os
+import sys
 import math
 import random
+import platform
+import glob
 
-from scipy.integrate import odeint
 import numpy
 
-"""
-First section contains general, static methods for use by BaseModel object in creating any epidemiological model object.
-"""
+try:
+    from scipy.integrate import odeint
+except:
+    print("Unable to load scipy")
 
+try:
+    from graphviz import Digraph
+except:
+    print("Unable to load graphviz")
+
+
+# General file-handling methods for use in examples
+
+def ensure_out_dir(out_dir):
+    """
+    Make sure the output directory exists and create if it doesn't.
+    """
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+
+
+def open_pngs_in_dir(out_dir):
+    """
+    Open the .png image files through the OS
+    """
+    pngs = glob.glob(os.path.join(out_dir, '*png'))
+    operating_system = platform.system()
+    if 'Windows' in operating_system:
+        os.system("start " + " ".join(pngs))
+    elif 'Darwin' in operating_system:
+        os.system('open ' + " ".join(pngs))
+
+
+# function used by BaseModel in data manipulation
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """
     Adds or modifies a list of tuples, compares only the items before the last in the tuples,
     the last value in the tuple is assumed to be a value.
     """
-
     for i, test_tuple in enumerate(a_list):
         if test_tuple[:-1] == a_tuple[:-1]:
             a_list[i] = a_tuple
@@ -41,12 +73,12 @@ def label_intersects_tags(label, tags):
         label: The string we're searching for
         tags: List for comparison
     """
-
     for tag in tags:
         if tag in label:
             return True
     return False
 
+# Math functions for more comples scale-up functions
 
 def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
     """
@@ -64,7 +96,6 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
         the halfway point is at x_inflect on the x-axis and the slope
         at x_inflect goes to (0, y_low) if the multiplier is 1.
     """
-
     amplitude = y_high - y_low
     if amplitude == 0:
         def curve(x):
@@ -87,15 +118,12 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
 
 
 def make_constant_function(value):
-
     def curve(x):
         return value
-
     return curve
 
 
 def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
-
     curve1 = make_sigmoidal_curve(
         y_high=y_med, y_low=y_low,
         x_start=x_start, x_inflect=(x_med-x_start)*0.5 + x_start,
@@ -135,8 +163,8 @@ def pick_event(event_intervals):
 class BaseModel:
     """
     Basic concepts
-      var - values that are calculated at every time step
-      param - values that remain fixed throughout the model run
+      vars - values that are calculated at every time step
+      params - values that remain fixed throughout the model run
     """
 
     def __init__(self):
@@ -518,6 +546,8 @@ class BaseModel:
         if method == 'explicit':
             self.integrate_explicit(y, derivative)
         elif method == 'scipy':
+            if 'odeint' not in sys.modules:
+                raise Exception("scipy module was not loaded")
             self.soln_array = odeint(derivative, y, self.times)
         self.calculate_diagnostics()
 
@@ -853,8 +883,6 @@ class BaseModel:
             png: String for the filename of the file for the diagram to be stored in
         """
 
-        from graphviz import Digraph
-
         styles = {
             'graph': {
                 'fontsize': '14',
@@ -892,6 +920,10 @@ class BaseModel:
 
             return '%.3g' % f
 
+        if 'graphviz' not in sys.modules:
+            print("Cannot make flow-chart as graphviz was not loaded")
+            return
+
         self.graph = Digraph(format='png')
         for label in self.labels:
             self.graph.node(label)
@@ -910,7 +942,10 @@ class BaseModel:
 
         self.graph = apply_styles(self.graph, styles)
 
-        self.graph.render(base)
+        try:
+            self.graph.render(base)
+        except:
+            print("Error running graphviz: graphviz probably not installed on your system")
 
     def check_converged_compartment_fraction(self, label, equil_time, test_fraction_diff):
         """

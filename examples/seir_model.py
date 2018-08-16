@@ -1,13 +1,11 @@
 
-import platform
+# hack to allow basepop to be loaded from the examples directory
 import os
-import glob
 import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
-from basepop import BaseModel
 import pylab
-import tool_kit
+import basepop
 
 """
 The following file creates and executes models with SIR and SEIR structures. It then graphs the results and presents the
@@ -18,11 +16,11 @@ following text:
 "An Introduction to Infectious Disease Modelling" by Emilia Vynnycky and Richard G White
 available at http://www.anintroductiontoinfectiousdiseasemodelling.com/ with Excel-based model solutions.
 
-It uses methods from the BaseModel class in the basepop.py file from this module (one directory above) to create the
+It uses methods from the basepop.BaseModel class in the basepop.py file from this module (one directory above) to create the
 model objects for SIR and SEIR models.
 
 The purpose of this file is to present examples of how such models can be built in Python within this popdynamics
-module. Specifically, the user should note how inherited methods from BaseModel are used to ensure processes such as
+module. Specifically, the user should note how inherited methods from basepop.BaseModel are used to ensure processes such as
 compartment initiation and setting of flows (entry, transfer and exit) are performed correctly.
 
 The first section of the code (to line 116) presents static functions for use in the master script.
@@ -101,7 +99,7 @@ def plot_compartment_proportions(model, infection):
 ###################################
 
 
-class SirModel(BaseModel):
+class SirModel(basepop.BaseModel):
     """
     Based on the SIR models from Vynnycky and White Chapter 2
     and the corresponding on-line Excel difference equation-based models for measles and for flu.
@@ -120,7 +118,7 @@ class SirModel(BaseModel):
                 duration_infectious:    Number of days spent in the infectious compartment
         """
 
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         # set starting compartment values
         self.set_compartment('susceptible',
@@ -184,7 +182,7 @@ class SeirModel(SirModel):
                 duration_infectious:    Number of days spent in the infectious compartment
         """
 
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         # set starting compartment values
         self.set_compartment('susceptible',
@@ -245,7 +243,7 @@ class SeirDemographyModel(SeirModel):
 
     def __init__(self, param_dictionary):
 
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         # set starting compartment values
         self.set_compartment('susceptible',
@@ -330,7 +328,7 @@ for infection in ['flu', 'measles']:
 
     # set output directory
     out_dir = infection + '_sir_graphs'
-    tool_kit.ensure_out_dir(out_dir)
+    basepop.ensure_out_dir(out_dir)
 
     # plot results
     model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
@@ -347,7 +345,7 @@ for infection in ['flu', 'measles']:
 
     # set output directory
     out_dir = infection + '_seir_graphs'
-    tool_kit.ensure_out_dir(out_dir)
+    basepop.ensure_out_dir(out_dir)
 
     # plot results
     model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
@@ -362,7 +360,7 @@ for infection in ['flu', 'measles']:
         plot_compartment_proportions(model, infection)
 
     # open output directory
-    tool_kit.open_out_dir(out_dir)
+    basepop.open_pngs_in_dir(out_dir)
 
 #############################
 # SEIR with demography
@@ -374,7 +372,7 @@ model.integrate('explicit')
 
 # set output directory
 out_dir = 'measles_seir_demography_graphs'
-tool_kit.ensure_out_dir(out_dir)
+basepop.ensure_out_dir(out_dir)
 
 # plot results
 model.make_graph(os.path.join(out_dir, 'measles_flow_diagram'))
@@ -460,5 +458,5 @@ model.integrate('explicit')
 
 # set output directory
 out_dir = 'partial_immunity_graphs'
-tool_kit.ensure_out_dir(out_dir)
+basepop.ensure_out_dir(out_dir)
 plot_compartment_sizes(model)

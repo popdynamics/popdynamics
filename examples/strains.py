@@ -7,18 +7,17 @@ Michael Meehan's competitive-strain SIR model.
 
 from __future__ import print_function
 import platform
-import os
 import glob
-import sys
 import math
 
+# hack to allow basepop to be loaded from the examples directory
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+
+from basepop import BaseModel
 import pylab
 import matplotlib
-
-# hack to allow basepop to be loaded from the examples directory
-parent_dir = os.path.join(os.path.dirname(__file__), "..")
-sys.path.insert(0, parent_dir)
-from basepop import BaseModel
 
 
 class StrainsModel(BaseModel):

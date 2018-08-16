@@ -8,11 +8,11 @@ following text:
 "An Introduction to Infectious Disease Modelling" by Emilia Vynnycky and Richard G White
 available at http://www.anintroductiontoinfectiousdiseasemodelling.com/ with Excel-based model solutions.
 
-It uses methods from the BaseModel class in the basepop.py file from this module (one directory above) to create the
+It uses methods from the basepop.BaseModel class in the basepop.py file from this module (one directory above) to create the
 model objects for SIR and SEIR models.
 
 The purpose of this file is to present examples of how such models can be built in Python within this popdynamics
-module. Specifically, the user should note how inherited methods from BaseModel are used to ensure processes such as
+module. Specifically, the user should note how inherited methods from basepop.BaseModel are used to ensure processes such as
 compartment initiation and setting of flows (entry, transfer and exit) are performed correctly.
 
 The first section of the code (to line 116) presents static functions for use in the master script.
@@ -31,26 +31,13 @@ Suggestion to get started:
 
 """
 
-import platform
+# hack to allow basepop to be loaded from the examples directory
 import os
-import glob
 import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 
 import pylab
-
-# hack to allow basepop to be loaded from the examples directory
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
-
-from basepop import BaseModel
-
-
-def open_pngs_in_dir(pngs_dir):
-    pngs = glob.glob(os.path.join(pngs_dir, "*png"))
-    operating_system = platform.system()
-    if "Windows" in operating_system:
-        os.system("start " + " ".join(pngs))
-    elif "Darwin" in operating_system:
-        os.system("open " + " ".join(pngs))
+import basepop
 
 
 def plot_epidemiological_indicators(model, indicators, out_dir, ylog=False):
@@ -129,11 +116,11 @@ def generate_output(model, infection):
 
     plot_rn(model, model.params["r0"], out_dir)
 
-    open_pngs_in_dir(out_dir)
+    basepop.open_pngs_in_dir(out_dir)
 
 
 
-class SirModel(BaseModel):
+class SirModel(basepop.BaseModel):
     """
     Based on the SIR models from Vynnycky and White Chapter 2
     and the corresponding on-line Excel difference equation-based
@@ -156,7 +143,7 @@ class SirModel(BaseModel):
         }
         """
 
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         # define compartments and set their starting values
         self.set_compartment(
@@ -250,20 +237,9 @@ measles_params = {
 }
 
 
-measles_params = {
-    "population": 5000,
-    "start_infectious": 1.,
-    "r0": 2.,
-    "duration_preinfectious": 8.,
-    "duration_infectious": 7.,
-    "life_expectancy": 70. * 365.
-}
-
 model = SirModel(measles_params)
 model.make_times(0, 100, 1)
-# model.integrate("explicit")
-# model.integrate_continuous_stochastic()
-model.integrate_discrete_time_stochastic()
+model.integrate()
 
 # example graph generation
 generate_output(model, "measles")

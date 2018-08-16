@@ -1,19 +1,18 @@
 
 import os
-from basepop import BaseModel
+import basepop
 import numpy
 import pylab
-import tool_kit
 
 
-class RmitTbModel(BaseModel):
+class RmitTbModel(basepop.BaseModel):
     """
     TB model by Isaac Mwangi.
-    Nested inheritance from BaseModel, which applies to any infectious disease generally.
+    Nested inheritance from basepop.BaseModel, which applies to any infectious disease generally.
     """
 
     def __init__(self, parameters):
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         # define all compartments, initialise as empty and then populate
         model_compartments = ['S', 'L1', 'L2', 'P', 'I', 'R']
@@ -156,5 +155,5 @@ if __name__ == '__main__':
         pylab.ylim([9e-7, 1.])
         pylab.legend(frameon=False, loc=8)
         pylab.savefig(os.path.join(out_dir, 'figure_8' + fig_letter + '.png'))
-        tool_kit.open_out_dir(out_dir)
+        basepop.open_pngs_in_dir(out_dir)
 
