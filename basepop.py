@@ -1,28 +1,59 @@
 # -*- coding: utf-8 -*-
-
-
 """
 Base Population Model to handle different type of models
 """
 
+from __future__ import print_function
+from __future__ import division
+from builtins import zip
+from builtins import range
+from builtins import object
+from past.utils import old_div
+
 import os
+import sys
 import math
 import random
+import platform
+import glob
 
-from scipy.integrate import odeint
 import numpy
 
-"""
-First section contains general, static methods for use by BaseModel object in creating any epidemiological model object.
-"""
+try:
+    from scipy.integrate import odeint
+except:
+    print("Unable to load scipy")
 
+
+# General file-handling methods for use in examples
+
+def ensure_out_dir(out_dir):
+    """
+    Make sure the output directory exists and create if it doesn't.
+    """
+    if not os.path.isdir(out_dir):
+        os.makedirs(out_dir)
+
+
+def open_pngs_in_dir(out_dir):
+    """
+    Open the .png image files through the OS
+    """
+    pngs = glob.glob(os.path.join(out_dir, '*png'))
+    operating_system = platform.system()
+    if 'Windows' in operating_system:
+        os.system("start " + " ".join(pngs))
+    elif 'Darwin' in operating_system:
+        os.system('open ' + " ".join(pngs))
+
+
+# function used by BaseModel in data manipulation
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """
     Adds or modifies a list of tuples, compares only the items before the last in the tuples,
     the last value in the tuple is assumed to be a value.
     """
-
     for i, test_tuple in enumerate(a_list):
         if test_tuple[:-1] == a_tuple[:-1]:
             a_list[i] = a_tuple
@@ -41,12 +72,12 @@ def label_intersects_tags(label, tags):
         label: The string we're searching for
         tags: List for comparison
     """
-
     for tag in tags:
         if tag in label:
             return True
     return False
 
+# Math functions to build scale-up functions
 
 def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
     """
@@ -64,7 +95,6 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
         the halfway point is at x_inflect on the x-axis and the slope
         at x_inflect goes to (0, y_low) if the multiplier is 1.
     """
-
     amplitude = y_high - y_low
     if amplitude == 0:
         def curve(x):
@@ -81,21 +111,18 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
         # check for large values that will blow out exp
         if arg > 10.:
             return y_low
-        return amplitude / (1. + math.exp(arg)) + y_low
+        return old_div(amplitude, (1. + math.exp(arg))) + y_low
 
     return curve
 
 
 def make_constant_function(value):
-
     def curve(x):
         return value
-
     return curve
 
 
 def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
-
     curve1 = make_sigmoidal_curve(
         y_high=y_med, y_low=y_low,
         x_start=x_start, x_inflect=(x_med-x_start)*0.5 + x_start,
@@ -132,18 +159,17 @@ def pick_event(event_intervals):
     return i_event
 
 
-class BaseModel:
+class BaseModel(object):
     """
     Basic concepts
-      var - values that are calculated at every time step
-      param - values that remain fixed throughout the model run
+      vars - values that are calculated at every time step
+      params - values that remain fixed throughout the model run
     """
 
     def __init__(self):
 
         # list of labels for all compartments
         self.labels = []
-        self.compartments = {}
 
         # stores the initial value for all compartments
         self.init_compartments = {}
@@ -242,7 +268,7 @@ class BaseModel:
 
         self.times = []
         step = start
-        delta = (end - start) / float(n)
+        delta = old_div((end - start), float(n))
         while step <= end:
             self.times.append(step)
             step += delta
@@ -272,7 +298,7 @@ class BaseModel:
             val: Value (generally float) for the parameter
         """
 
-        assert type(label) is str, 'Parameter name is not string'
+        assert type(label) is str, 'Parameter name "%s" is not string' % label
         assert type(val) is float or type(val) is int, 'Fixed parameter value is not numeric for %' % label
         self.params[label] = val
 
@@ -398,7 +424,7 @@ class BaseModel:
         (to be called within the integration process).
         """
 
-        for label, fn in self.scaleup_fns.iteritems(): 
+        for label, fn in self.scaleup_fns.items():
             self.vars[label] = fn(self.time)
 
     def calculate_vars(self):
@@ -519,6 +545,8 @@ class BaseModel:
         if method == 'explicit':
             self.integrate_explicit(y, derivative)
         elif method == 'scipy':
+            if 'scipy' not in sys.modules:
+                raise Exception("scipy module was not loaded")
             self.soln_array = odeint(derivative, y, self.times)
         self.calculate_diagnostics()
 
@@ -631,7 +659,7 @@ class BaseModel:
                 i_event = pick_event(event_rates)
 
                 total_rate = sum(event_rates)
-                dt = - math.log(random.random()) / total_rate
+                dt = old_div(- math.log(random.random()), total_rate)
 
                 from_label, to_label, rate = self.events[i_event]
                 if from_label and to_label:
@@ -749,7 +777,7 @@ class BaseModel:
             # only set after self.calculate_diagnostic_vars has been run so that we have all var_labels,
             # including the ones in calculate_diagnostic_vars
             if self.var_labels is None:
-                self.var_labels = self.vars.keys()
+                self.var_labels = list(self.vars.keys())
                 self.var_array = numpy.zeros((n_time, len(self.var_labels)))
                 self.flow_array = numpy.zeros((n_time, len(self.labels)))
 
@@ -762,7 +790,7 @@ class BaseModel:
         self.fraction_soln = {}
         for label in self.labels:
             self.fraction_soln[label] = [
-                v / t
+                old_div(v, t)
                 for v, t
                 in zip(
                     self.population_soln[label],
@@ -854,24 +882,30 @@ class BaseModel:
             png: String for the filename of the file for the diagram to be stored in
         """
 
-        from graphviz import Digraph
+        try:
+            from graphviz import Digraph
+        except:
+            print("Cannot make flow-chart as graphviz was not loaded")
+            return
 
         styles = {
             'graph': {
-                'label': 'Dynamic Transmission Model',
-                'fontsize': '16',
+                'fontsize': '14',
+                'fontname': 'Helvetica',
+                'pad': '0.2',
             },
             'nodes': {
                 'fontname': 'Helvetica',
                 'shape': 'box',
-                'style': 'filled',
-                'fillcolor': '#CCDDFF',
+                'style': 'filled, rounded',
+                'fillcolor': '#DDEEFF',
+                'color': '#AABBDD'
             },
             'edges': {
                 'style': 'dotted',
                 'arrowhead': 'open',
-                'fontname': 'Courier',
-                'fontsize': '10',
+                'fontname': 'Helvetica',
+                'fontsize': '8',
             }
         }
 
@@ -891,26 +925,6 @@ class BaseModel:
 
             return '%.3g' % f
 
-            # alternative code to uncomment if you prefer more natural language, rather than scientific notation
-            # abs_f = abs(f)
-            # if abs_f > 1e9:
-            #     return '%.1f billion' % (f / 1e9)
-            # if abs_f > 1e6:
-            #     return '%.1f million' % (f / 1e6)
-            # if abs_f > 1e3:
-            #     return '%.1f thousand' % (f / 1e3)
-            # if abs_f > 1e2:
-            #     return '%.0f' % f
-            # if abs_f > 0.5:
-            #     return '%.1f' % f
-            # if abs_f > 5e-2:
-            #     return '%.2f' % f
-            # if abs_f > 5e-4:
-            #     return '%.4f' % f
-            # if abs_f > 5e-6:
-            #     return '%.6f' % f
-            # return str(f)
-
         self.graph = Digraph(format='png')
         for label in self.labels:
             self.graph.node(label)
@@ -929,7 +943,10 @@ class BaseModel:
 
         self.graph = apply_styles(self.graph, styles)
 
-        self.graph.render(base)
+        try:
+            self.graph.render(base)
+        except:
+            print("Error running graphviz: probably not installed on your system")
 
     def check_converged_compartment_fraction(self, label, equil_time, test_fraction_diff):
         """
@@ -960,4 +977,3 @@ class BaseModel:
             if abs(frac_diff) > test_fraction_diff:
                 return False
         return True
-

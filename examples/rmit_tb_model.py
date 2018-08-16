@@ -1,7 +1,9 @@
 """
 TB model by Isaac Mwangi.
+
 Nested inheritance from basepop.BaseModel, which applies to any infectious disease generally.
 """
+
 from __future__ import print_function
 from __future__ import division
 from builtins import range
