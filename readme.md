@@ -1,103 +1,73 @@
+
+
+
+
 # Popdynamics
 
-Popdynamics is a library for building epidemiological models. Popdynamics is designed to make it easy to build, and modify compartment models. As well, it provides options to switch between deterministic ODE solutions, and stochastic discrete-time and continuous-time models.
+Popdynamics is a library for building epidemiological models, or for that matter, any kind of compartmental model. It provides an easy way to switch between different integration methods
 
-# Why?
+- direct integration of ODE
+- integration of ODE using the Scipy library
+- stochastic discrete-time
+- stochastic continuous-time
 
-- epidemiological models
-  - most frequently consist of systems of differential equations
-  - equations describe relationships between compartments
-  - strict conservation of populations
-- typical epidemiological modelling
-  - inspired by fortran
-  - today implemented in `matlab`, `python` or `R` 
-  - implemented as differential equations
-  - reliance on algebraic symbols
-  - focus on the differential equation
-- increasing trend to more complex models
-  - to simulate realistic dynamics, modern models may need stratification by:
-    - compartment (as patient progresses through infection, activation, detection, treatment, recovery, death, etc.)
-    - manifestation (organ involved, infectiousness)
-    - drug resistance of infecting organism
-    - population/demographic risk group
-    - medical comorbidity
-    - age
-    - others
-  - stratifications are often multiplicative, meaning that realistic models may require hundreds to thousands of compartments or more
-  - it then becomes difficult to impossible to track and understand the behaviour of every compartment individuals
-  - also difficulty/impossible to write down the system of ODEs and more prone to mistakes
 
-# Modern programming approach
+## Installation
 
-Basepop provides a modern approach to epidemiological modelling. It incorporates a style of programming from various areas of programming. The essence of the approach is to modularize the different parts of the modelling so that the essential complexity is maintained, and accidental complexity is sidelined. This allows the focus on the epidemiology and not the maths, or the syntax
+Popdynamics has been written to be compatible with Python 2 and Python 3. There are two main approaches to install the dependencies.
 
-The other aspect is to ensure the data-structures of the model are fully exposed and can be manipulated easily for higher order analysis.
+_1) Anaconda Python_
 
-It's important to create a suitable abstraction so that the focus at different parts of the programming is on one thing. This allows clearer thinking about the model, and also helps with bugs. If different parts of the program are only concerned with one element of the model, then finding and detecting bugs will be considerably easier.
+Install the [Anaconda Python](https://www.anaconda.com/download/#macos) environment. This package already contains all the dependencies required.
 
-The Pythonic approach is about using the correct idioms in Python. Using as much of the syntax in Python to reduce clutter, needless variables, and control structures. Of cousre, it takes awhile to master this as Python provides many more types of programming approachs than Fortran or Matlab: first class functions, functional program, introspection, dynamic programming.
+_2) Local Python_
 
-- `Pythonic` approach
-- the goal
-  - focus on the epidemiology 
-  - hide the maths
-- alternative view
-  - not equation based
-  - focus on compartments
-  - focus on flows
-  - because we have constructed with flows then the flowchar can be built using the `grapgviz` library
-- by intelligently splitting things up, allows:
-  - creating automatic flow diagrams for debugging
-  - allows constructing equations behind the scenes
-  - thus freeing the researcher from general house-keeping and focusing on the model
+If you have your own Python environment, you will have to install the dependencies. In the main Popdynamics directory, to install the dependencies:
 
-  - dynamically create compartments
-  - build up model through identify flows, 
-  - let's the model build the vector representation and differentiation and derivatives
-  - use strings to identify compartments and parameters
-  - transfers between compartments built up using edges defined by the labels
-  - auto generation of graphs of models
-  - allows programmatic generation of compartments and transfers
-  - allows easy scale-up functions
-  - avoidance of errors, such as:
-    - transition flows that do not have either an entry or an exit compartment,
-        or the entry value is not equal to the exit
-    - entry (birth) flows that do not have an entry compartment or have an exit compartment
-    - exit (death) flows that have an entry compartment or do not have an exit compartment
-    - fixed flows that are not associated with a constant parameter or variable flows that are not associated with a
-        time-variant parameter to be calculated at each model step
-- by ensuring methods and functions are as independent as possible, adaptations to model can usually be achieved through
-    changes to a single method/function
-    - for example, further integration methods can be added to explicit and scipy by changing a single method only
-    - similarly, additional output diagnostics can be added by changing a single method
-        - e.g. those specific to a particular organism/disease
+```bash
+> python setup.py develop
+```
 
-# General sequential approach
+If you want to auto-generate flow-charts, you will also have to download [Graphviz](https://graphviz.gitlab.io/download/), which is a binary to generate well-formated flow-charts. Popydnamics will skip flow-charts if Graphviz is not found.
 
-- setting up compartments
-- defining flows between compartments
-- setting up parameters
-- setting up dynamic transmissions
-- collecting diagnostic variables
-- saving trajectories
+Requirements: _python 2/3; numpy, scipy, matplotlib, graphviz (python), graphviz (binary)_
 
-# Examples
 
-- create a model with dynamic transmission
-- show how to extract out vectors and derivatives
-- programmatically generate compartments 
-- programmatically generate diagnostic variables
-- saving variables for use later
-- create a simple model @done
-- scale-up function @done
-- flow chart @done
-- produce graphs with matplotlib - javascript option @done
+## Quick start
 
-# Requirements
+Once the modules are installed, go the `examples` directory, and run:
 
-- python 2.7
-- numpy
-- scipy 
-- graphviz.py 
-- graphviz binary on path: http://www.graphviz.org/
+```bash
+> python sir_model.py
+```
+
+Then try the other examples.
+
+- `sir_model.py` - a simple model showing a basic SIR model
+- `seir_model.py` - basic SEIR model with a demography variation
+- `stochastic_strains_model.py` - an SIR model using stochastic models to average over many runs
+- `tb_model.py` - a basic TB model that represents the approach used by [AuTuMN](http://www.tb-modelling.com/home/index.php)
+- `rmit_tb_model.py` - a reproduction of a TB model in the literature
+
+
+
+## Why?
+
+Epidemiological models are typically modeled as compartmental models where populations evolve through linear ordinary differential equations (ODE), or through stochastic models with probability transition matrices.
+
+Approaches to modelling involve writing out the complete ODE for each compartment and typing these equations in matrix based programming enviromnents such as Fortran, Matlab and R.
+
+In this approach, the management of these equations involve the use of poor mnemonics (single or two letter variables) and large chains of equation. This is an error-prone process.
+
+The marjority of the terms in the ODE's is to connect coupled changes between compartments, with a smaller number of single entry/exit terms. Since the coupling is between different equations, it is exceedingly easy to lose track of the coupling.
+
+A more modern approach is to track the coupling between compartments, and use meaningful descriptive variable names. The resultant ODE is then constructed from these couplings. This is essentially automating the double-entry book-keeping between coupled changes between compartments.
+
+By approaching compartmental models in terms of coupling between compartments, it is then very easy to apply stochastic approaches to the integration, as well as to use the information to auto-generate flow-charts of the model.
+
+The model has been carefully considered to use an underlying data structure that is as simple as possible, and allows the results to be easily exported for graphing.
+
+
+
+
 

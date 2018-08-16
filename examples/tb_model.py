@@ -1,19 +1,8 @@
-
-import sys
-import platform
-import os
-import glob
-
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-from basepop import BaseModel, make_sigmoidal_curve
-import tool_kit
-
-
 """
 This file presents a transmission dynamic model for TB based on those most commonly used by the AuTuMN team
 See http://www.tb-modelling.com/home/index.php for more information on AuTuMN.
 
-Similar to seir_model.py, it uses methods from the BaseModel class in the basepop.py file from this module
+Similar to seir_model.py, it uses methods from the basepop.BaseModel class in the basepop.py file from this module
 (one directory above) to create the model objects for two similar TB transmission dynamic models.
 
 It advances upon the seir_model.py examples by incorporating time-variant functions used to represent changes in
@@ -33,6 +22,17 @@ Suggestion to get started:
 - Try adding another intervention in a similar way to that presented for BCG vaccination (e.g. treatment of LTBI,
  active case finding).
 """
+
+from __future__ import print_function
+from __future__ import division
+from builtins import map
+from past.utils import old_div
+
+# hack to allow basepop to be loaded from the parent directory
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+import basepop
 
 
 ########################################################
@@ -54,7 +54,7 @@ def make_plots(model, out_dir):
     # scaling case detection rate
     pylab.clf()
     scaleup_fn = model.scaleup_fns['program_rate_detect']
-    y_vals = map(scaleup_fn, model.times)
+    y_vals = list(map(scaleup_fn, model.times))
     pylab.plot(model.times, y_vals)
     pylab.title('scaleup test curve')
     pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
@@ -72,10 +72,10 @@ def make_plots(model, out_dir):
 ### Define model object class ###
 #################################
 
-class SimpleTbModel(BaseModel):
+class SimpleTbModel(basepop.BaseModel):
     """
     Initial TB model by James Trauer.
-    Nested inheritance from BaseModel, which applies to any infectious disease generally.
+    Nested inheritance from basepop.BaseModel, which applies to any infectious disease generally.
     """
 
     def __init__(self, fixed_parameters, interventions=[]):
@@ -84,7 +84,7 @@ class SimpleTbModel(BaseModel):
             interventions: List of interventions to be simulated in the run of the model
         """
 
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         # make interventions list an attribute of the object
         self.interventions = interventions
@@ -102,19 +102,19 @@ class SimpleTbModel(BaseModel):
             self.set_compartment('susceptible_vaccinated', 0.)
 
         # parameter setting
-        for parameter, value in fixed_parameters.items():
+        for parameter, value in list(fixed_parameters.items()):
             self.set_param(parameter, value)
 
         # example of a scaling parameter (case detection rate)
-        curve1 = make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
-        curve2 = make_sigmoidal_curve(y_high=4, y_low=2, x_start=1995, x_inflect=2003, multiplier=3)
+        curve1 = basepop.make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
+        curve2 = basepop.make_sigmoidal_curve(y_high=4, y_low=2, x_start=1995, x_inflect=2003, multiplier=3)
         two_step_curve = lambda x: curve1(x) if x < 1990 else curve2(x)
         self.set_scaleup_fn('program_rate_detect', two_step_curve)
 
         # example of an intervention - BCG vaccination
         if 'vaccination' in self.interventions:
             self.set_param('int_vaccine_efficacy', .5)
-            vaccination_curve = make_sigmoidal_curve(y_high=.95, y_low=0, x_start=1921, x_inflect=2006, multiplier=3)
+            vaccination_curve = basepop.make_sigmoidal_curve(y_high=.95, y_low=0, x_start=1921, x_inflect=2006, multiplier=3)
             self.set_scaleup_fn('int_vaccination', vaccination_curve)
 
     def calculate_vars(self):
@@ -210,20 +210,20 @@ if __name__ == '__main__':
 
     time_treatment = .5
     fixed_parameters = {
-        'demo_rate_birth': 20. / 1e3,
-        'demo_rate_death': 1. / 65,
+        'demo_rate_birth': old_div(20., 1e3),
+        'demo_rate_death': old_div(1., 65),
         'tb_n_contact': 40.,
-        'tb_rate_earlyprogress': .1 / .5,
-        'tb_rate_lateprogress': .1 / 100.,
-        'tb_rate_stabilise': .9 / .5,
-        'tb_rate_recover': .6 / 3.,
-        'tb_rate_death': .4 / 3.,
-        'program_rate_completion_infect': .9 / time_treatment,
-        'program_rate_default_infect': .05 / time_treatment,
-        'program_rate_death_infect': .05 / time_treatment,
-        'program_rate_completion_noninfect': .9 / time_treatment,
-        'program_rate_default_noninfect': .05 / time_treatment,
-        'program_rate_death_noninfect': .05 / time_treatment
+        'tb_rate_earlyprogress': old_div(.1, .5),
+        'tb_rate_lateprogress': old_div(.1, 100.),
+        'tb_rate_stabilise': old_div(.9, .5),
+        'tb_rate_recover': old_div(.6, 3.),
+        'tb_rate_death': old_div(.4, 3.),
+        'program_rate_completion_infect': old_div(.9, time_treatment),
+        'program_rate_default_infect': old_div(.05, time_treatment),
+        'program_rate_death_infect': old_div(.05, time_treatment),
+        'program_rate_completion_noninfect': old_div(.9, time_treatment),
+        'program_rate_default_noninfect': old_div(.05, time_treatment),
+        'program_rate_death_noninfect': old_div(.05, time_treatment)
     }
 
     model = SimpleTbModel(fixed_parameters)
@@ -232,10 +232,10 @@ if __name__ == '__main__':
 
     # graph outputs
     out_dir = 'tb_graphs'
-    tool_kit.ensure_out_dir(out_dir)
+    basepop.ensure_out_dir(out_dir)
     model.make_graph(os.path.join(out_dir, 'workflow'))
     make_plots(model, out_dir)
-    tool_kit.open_out_dir(out_dir)
+    basepop.open_pngs_in_dir(out_dir)
 
     # add vaccination as an intervention to the same model as run and presented immediately above
     model = SimpleTbModel(fixed_parameters, ['vaccination'])
@@ -244,7 +244,7 @@ if __name__ == '__main__':
 
     # graph outputs
     out_dir = 'tb_vaccination_graphs'
-    tool_kit.ensure_out_dir(out_dir)
+    basepop.ensure_out_dir(out_dir)
     model.make_graph(os.path.join(out_dir, 'workflow'))
     make_plots(model, out_dir)
-    tool_kit.open_out_dir(out_dir)
+    basepop.open_pngs_in_dir(out_dir)
