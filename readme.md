@@ -18,7 +18,19 @@ Popdynamics has been written to be compatible with Python 2 and Python 3. There 
 
 _1) Anaconda Python_
 
-Install the [Anaconda Python](https://www.anaconda.com/download/#macos) environment. This package already contains all the dependencies required.
+Install the [Anaconda Python](https://www.anaconda.com/download/#macos) environment. This package already contains most of the dependencies required.
+
+To install graphviz:
+
+```bash
+> conda install graphviz
+```
+
+Then:
+
+```bash
+> conda install python-graphviz
+```
 
 _2) Local Python_
 
