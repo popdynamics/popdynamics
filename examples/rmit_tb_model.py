@@ -1,16 +1,22 @@
+"""
+TB model by Isaac Mwangi.
+Nested inheritance from basepop.BaseModel, which applies to any infectious disease generally.
+"""
+from __future__ import print_function
+from __future__ import division
+from builtins import range
+from past.utils import old_div
 
+# hack to allow basepop to be loaded from the examples directory
 import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 import basepop
+
 import numpy
 import pylab
 
-
 class RmitTbModel(basepop.BaseModel):
-    """
-    TB model by Isaac Mwangi.
-    Nested inheritance from basepop.BaseModel, which applies to any infectious disease generally.
-    """
-
     def __init__(self, parameters):
         basepop.BaseModel.__init__(self)
 
@@ -21,7 +27,8 @@ class RmitTbModel(basepop.BaseModel):
         self.set_compartment('I', 1e-3)
 
         # parameter setting
-        for parameter, value in parameters.items(): self.set_param(parameter, value)
+        for parameter, value in list(parameters.items()):
+            self.set_param(parameter, value)
 
         # parameter processing
         self.set_param('f_phi', self.params['f'] * self.params['phi'])
@@ -78,7 +85,7 @@ class RmitTbModel(basepop.BaseModel):
         Calculate output variables from model quantities.
         """
 
-        self.vars['proportion'] = self.compartments['I'] / self.vars['population']
+        self.vars['proportion'] = old_div(self.compartments['I'], self.vars['population'])
 
 
 ''' run model '''
@@ -86,13 +93,13 @@ class RmitTbModel(basepop.BaseModel):
 
 if __name__ == '__main__':
     fixed_parameters = {
-        'mu': 1. / 70.,
+        'mu': old_div(1., 70.),
         'd': .1,
         'phi': 12,
         'f': .05,  # not sure whether 0.05 or 0.5?
         'eta': 2e-4,
-        'tau': 1. / 2.,
-        'alpha': 2. / 9.,
+        'tau': old_div(1., 2.),
+        'alpha': old_div(2., 9.),
         'theta': 1.,
         'rho': 0.1,
         'omega': 2e-5,
@@ -108,12 +115,13 @@ if __name__ == '__main__':
     betas += list(numpy.linspace(100., 500., 51))
     proportions = []
     for beta in betas:
+        print('beta', float(beta))
         model = RmitTbModel(fixed_parameters)
         model.set_param('beta', float(beta))
         model.make_times(0, 500., 1.)
         model.integrate(method='explicit')
         proportions.append(model.vars['proportion'])
-    out_dir = 'tb_graphs'
+    out_dir = 'rmit_tb_graphs'
     pylab.clf()
     pylab.semilogy(betas, proportions)
     text = r''
@@ -139,6 +147,7 @@ if __name__ == '__main__':
         for rho in [0., 0.5, 1., 10.]:
             proportions = []
             for beta in betas:
+                print('rho', float(rho), 'beta', float(beta))
                 model = RmitTbModel(fixed_parameters)
                 model.set_param('beta', float(beta))
                 model.set_param('rho', float(rho))

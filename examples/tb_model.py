@@ -1,12 +1,3 @@
-
-import sys
-import os
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-
-
-import basepop
-
-
 """
 This file presents a transmission dynamic model for TB based on those most commonly used by the AuTuMN team
 See http://www.tb-modelling.com/home/index.php for more information on AuTuMN.
@@ -32,6 +23,15 @@ Suggestion to get started:
  active case finding).
 """
 
+from __future__ import division
+from builtins import map
+from past.utils import old_div
+
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+import basepop
+
 
 ########################################################
 ### Static functions for graphing and managing files ###
@@ -52,7 +52,7 @@ def make_plots(model, out_dir):
     # scaling case detection rate
     pylab.clf()
     scaleup_fn = model.scaleup_fns['program_rate_detect']
-    y_vals = map(scaleup_fn, model.times)
+    y_vals = list(map(scaleup_fn, model.times))
     pylab.plot(model.times, y_vals)
     pylab.title('scaleup test curve')
     pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
@@ -100,7 +100,7 @@ class SimpleTbModel(basepop.BaseModel):
             self.set_compartment('susceptible_vaccinated', 0.)
 
         # parameter setting
-        for parameter, value in fixed_parameters.items():
+        for parameter, value in list(fixed_parameters.items()):
             self.set_param(parameter, value)
 
         # example of a scaling parameter (case detection rate)
@@ -208,20 +208,20 @@ if __name__ == '__main__':
 
     time_treatment = .5
     fixed_parameters = {
-        'demo_rate_birth': 20. / 1e3,
-        'demo_rate_death': 1. / 65,
+        'demo_rate_birth': old_div(20., 1e3),
+        'demo_rate_death': old_div(1., 65),
         'tb_n_contact': 40.,
-        'tb_rate_earlyprogress': .1 / .5,
-        'tb_rate_lateprogress': .1 / 100.,
-        'tb_rate_stabilise': .9 / .5,
-        'tb_rate_recover': .6 / 3.,
-        'tb_rate_death': .4 / 3.,
-        'program_rate_completion_infect': .9 / time_treatment,
-        'program_rate_default_infect': .05 / time_treatment,
-        'program_rate_death_infect': .05 / time_treatment,
-        'program_rate_completion_noninfect': .9 / time_treatment,
-        'program_rate_default_noninfect': .05 / time_treatment,
-        'program_rate_death_noninfect': .05 / time_treatment
+        'tb_rate_earlyprogress': old_div(.1, .5),
+        'tb_rate_lateprogress': old_div(.1, 100.),
+        'tb_rate_stabilise': old_div(.9, .5),
+        'tb_rate_recover': old_div(.6, 3.),
+        'tb_rate_death': old_div(.4, 3.),
+        'program_rate_completion_infect': old_div(.9, time_treatment),
+        'program_rate_default_infect': old_div(.05, time_treatment),
+        'program_rate_death_infect': old_div(.05, time_treatment),
+        'program_rate_completion_noninfect': old_div(.9, time_treatment),
+        'program_rate_default_noninfect': old_div(.05, time_treatment),
+        'program_rate_death_noninfect': old_div(.05, time_treatment)
     }
 
     model = SimpleTbModel(fixed_parameters)

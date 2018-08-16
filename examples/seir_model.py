@@ -1,12 +1,3 @@
-
-# hack to allow basepop to be loaded from the examples directory
-import os
-import sys
-sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-
-import pylab
-import basepop
-
 """
 The following file creates and executes models with SIR and SEIR structures. It then graphs the results and presents the
 models' underlying compartmental structure.
@@ -37,6 +28,18 @@ Suggestion to get started:
 - Try adapting the SEIR model without demography to an SEIS model, by removing the recovered compartment and changing
  the recovery transition to move patients from infectious to susceptible (rather than recovered).
 """
+
+from __future__ import division
+from builtins import zip
+from past.utils import old_div
+
+# hack to allow basepop to be loaded from the examples directory
+import os
+import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+import basepop
+
+import pylab
 
 
 def plot_epidemiological_indicators(model, infection, indicators, out_dir, ylog=False):
@@ -85,7 +88,7 @@ def plot_compartment_proportions(model, infection):
     compartment_props = {}
     for compartment in model.compartments:
         compartment_props[compartment] \
-            = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
+            = [old_div(i, j) for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln("population"))]
         pylab.plot(model.times, compartment_props[compartment], label=compartment)
     r_n = [i * infection_param_dictionaries["flu"]["r0"] for i in compartment_props["susceptible"]]
     pylab.plot(model.times, r_n, label="Rn")
@@ -128,9 +131,8 @@ class SirModel(basepop.BaseModel):
 
         # set model parameters
         self.set_param('infection_beta',
-                       param_dictionary['r0']
-                       / (param_dictionary['duration_infectious'] * param_dictionary['population']))
-        self.set_param('infection_rate_recover', 1. / param_dictionary['duration_infectious'])
+                       old_div(param_dictionary['r0'], (param_dictionary['duration_infectious'] * param_dictionary['population'])))
+        self.set_param('infection_rate_recover', old_div(1., param_dictionary['duration_infectious']))
 
     def calculate_vars(self):
 
@@ -155,10 +157,10 @@ class SirModel(basepop.BaseModel):
         for from_label, to_label, rate in self.var_transfer_rate_flows:
             val = self.compartments[from_label] * self.vars[rate]
             if 'infectious' in to_label:
-                self.vars['incidence'] += val / self.vars['population']
+                self.vars['incidence'] += old_div(val, self.vars['population'])
 
         # calculate prevalence
-        self.vars['prevalence'] = self.compartments['infectious'] / self.vars['population']
+        self.vars['prevalence'] = old_div(self.compartments['infectious'], self.vars['population'])
 
 
 class SeirModel(SirModel):
@@ -193,10 +195,9 @@ class SeirModel(SirModel):
 
         # set model parameters
         self.set_param('infection_beta',
-                       param_dictionary['r0']
-                       / (param_dictionary['duration_infectious'] * param_dictionary['population']))
-        self.set_param('infection_rate_progress', 1. / param_dictionary['duration_preinfectious'])
-        self.set_param('infection_rate_recover', 1. / param_dictionary['duration_infectious'])
+                       old_div(param_dictionary['r0'], (param_dictionary['duration_infectious'] * param_dictionary['population'])))
+        self.set_param('infection_rate_progress', old_div(1., param_dictionary['duration_preinfectious']))
+        self.set_param('infection_rate_recover', old_div(1., param_dictionary['duration_infectious']))
 
     def set_flows(self):
 
@@ -222,17 +223,17 @@ class SeirModel(SirModel):
         for from_label, to_label, rate in self.fixed_transfer_rate_flows:
             val = self.compartments[from_label] * rate
             if 'infectious' in to_label:
-                self.vars['incidence'] += val / self.vars['population']
+                self.vars['incidence'] += old_div(val, self.vars['population'])
 
         # calculate new infections
         self.vars['infections'] = 0.
         for from_label, to_label, rate in self.var_transfer_rate_flows:
             val = self.compartments[from_label] * self.vars[rate]
             if 'preinfectious' in to_label:
-                self.vars['infections'] += val / self.vars['population']
+                self.vars['infections'] += old_div(val, self.vars['population'])
 
         # calculate prevalence
-        self.vars['prevalence'] = self.compartments['infectious'] / self.vars['population']
+        self.vars['prevalence'] = old_div(self.compartments['infectious'], self.vars['population'])
 
 
 class SeirDemographyModel(SeirModel):
@@ -255,10 +256,10 @@ class SeirDemographyModel(SeirModel):
         # set model parameters
         self.set_param(
             'infection_beta',
-            param_dictionary['r0'] / (param_dictionary['duration_infectious'] * param_dictionary['population']))
-        self.set_param('infection_rate_progress', 1. / param_dictionary['duration_preinfectious'])
-        self.set_param('infection_rate_recover', 1. / param_dictionary['duration_infectious'])
-        self.set_param('demo_rate_death', 1. / param_dictionary['life_expectancy'])
+            old_div(param_dictionary['r0'], (param_dictionary['duration_infectious'] * param_dictionary['population'])))
+        self.set_param('infection_rate_progress', old_div(1., param_dictionary['duration_preinfectious']))
+        self.set_param('infection_rate_recover', old_div(1., param_dictionary['duration_infectious']))
+        self.set_param('demo_rate_death', old_div(1., param_dictionary['life_expectancy']))
         self.set_param('demo_rate_birth', self.params['demo_rate_death'])  # closed population
 
     def set_flows(self):
@@ -387,7 +388,7 @@ model.integrate('explicit')
 compartment_props = {}
 for compartment in ['susceptible', 'immune']:
     compartment_props[compartment] \
-        = [i / j for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln('population'))]
+        = [old_div(i, j) for i, j in zip(model.get_compartment_soln(compartment), model.get_var_soln('population'))]
 r_n = [i * infection_param_dictionaries['measles']['r0'] for i in compartment_props['susceptible']]
 
 # plot incidence and Rn (Figure 1)

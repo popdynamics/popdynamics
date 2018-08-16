@@ -1,21 +1,24 @@
 """
-
 Michael Meehan's competitive-strain SIR model.
 
 @author: Bosco Ho, December 2017
 """
 
 from __future__ import print_function
-import platform
-import glob
-import math
+from __future__ import division
+from builtins import range
+from past.utils import old_div
 
 # hack to allow basepop to be loaded from the examples directory
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-
 from basepop import BaseModel
+
+import platform
+import glob
+import math
+
 import pylab
 import matplotlib
 
@@ -53,16 +56,16 @@ class StrainsModel(BaseModel):
             "rate_infection_death": 0,  # phi
         }
 
-        for key, value in default_params.items():
+        for key, value in list(default_params.items()):
             if key not in input_params:
                 input_params[key] = value
 
-        for key, value in input_params.items():
+        for key, value in list(input_params.items()):
             self.set_param(key, value)
 
         self.set_param(
             "s0",
-            self.params["rate_birth"] / self.params["rate_death"])
+            old_div(self.params["rate_birth"], self.params["rate_death"]))
         self.set_param(
             "beta_resident",
             self.params["r0_resident"] *
@@ -81,7 +84,7 @@ class StrainsModel(BaseModel):
         # define compartments and set their starting values
         self.set_compartment(
             "susceptible",
-            math.ceil(self.params["s0"] / self.params["r0_resident"]))
+            math.ceil(old_div(self.params["s0"], self.params["r0_resident"])))
         self.set_compartment(
             "infectious_resident",
             math.floor(
@@ -150,13 +153,13 @@ class StrainsModel(BaseModel):
         for from_label, to_label, rate in self.var_transfer_rate_flows:
             val = self.compartments[from_label] * self.vars[rate]
             if "infectious" in to_label:
-                self.vars["incidence"] += val / self.vars["population"]
+                self.vars["incidence"] += old_div(val, self.vars["population"])
 
         # calculate prevalence
         self.vars["prevalence"] = 0.
-        for label, val in self.compartments.items():
+        for label, val in list(self.compartments.items()):
             if "infectious" in label:
-                self.vars["prevalence"] += val / self.vars["population"]
+                self.vars["prevalence"] += old_div(val, self.vars["population"])
 
 
 # Run replicas of the model
@@ -196,7 +199,7 @@ asymptotic_prob_extinction = 1.0 * params["r0_resident"] / params["r0_invader"]
 pylab.clf()
 
 prob_extinction = []
-n_replica_range = range(1, n_replica)
+n_replica_range = list(range(1, n_replica))
 for n_replica in n_replica_range:
     n_extinct = extinction[:n_replica].count(True)
     prob_extinction.append(1.0 * n_extinct / n_replica)

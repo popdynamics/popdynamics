@@ -30,14 +30,17 @@ Suggestion to get started:
  the recovery transition to move patients from infectious to susceptible (rather than recovered).
 
 """
+from __future__ import division
+from builtins import zip
+from past.utils import old_div
 
 # hack to allow basepop to be loaded from the examples directory
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
+import basepop
 
 import pylab
-import basepop
 
 
 def plot_epidemiological_indicators(model, indicators, out_dir, ylog=False):
@@ -80,7 +83,7 @@ def plot_compartment_proportions(model, out_dir):
     for compartment in model.compartments:
         sizes = model.get_compartment_soln(compartment)
         populations = model.get_var_soln("population")
-        proportions = [i / j for i, j in zip(sizes, populations)]
+        proportions = [old_div(i, j) for i, j in zip(sizes, populations)]
         pylab.plot(model.times, proportions, label=compartment)
     pylab.title("Compartment proportions")
     pylab.legend()
@@ -91,7 +94,7 @@ def plot_rn(model, r0, out_dir):
     pylab.clf()
     susceptibles = model.get_compartment_soln("susceptible")
     populations = model.get_var_soln("population")
-    proportions = [i / j for i, j in zip(susceptibles, populations)]
+    proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
     r_n = [p * r0 for p in proportions]
     pylab.plot(model.times, r_n, label="Rn")
     pylab.title("Rn")
@@ -159,10 +162,10 @@ class SirModel(basepop.BaseModel):
         self.set_param("r0", params["r0"])
         self.set_param(
             "infection_beta",
-            params["r0"] / (params["duration_infectious"] * params["population"]))
+            old_div(params["r0"], (params["duration_infectious"] * params["population"])))
         self.set_param(
             "infection_rate_recover",
-            1. / params["duration_infectious"])
+            old_div(1., params["duration_infectious"]))
 
     def set_flows(self):
         """
@@ -211,11 +214,11 @@ class SirModel(basepop.BaseModel):
         for from_label, to_label, rate in self.var_transfer_rate_flows:
             val = self.compartments[from_label] * self.vars[rate]
             if "infectious" in to_label:
-                self.vars["incidence"] += val / self.vars["population"]
+                self.vars["incidence"] += old_div(val, self.vars["population"])
 
         # calculate prevalence
         self.vars["prevalence"] = \
-            self.compartments["infectious"] / self.vars["population"]
+            old_div(self.compartments["infectious"], self.vars["population"])
 
 
 flu_params = {

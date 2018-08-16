@@ -4,6 +4,9 @@ Popdynamics is a library for building epidemiological models, or any kind of com
 
 It provides an easy way to switch between different integration methods - both deterministic ODE solutions, and stochastic discrete-time and continuous-time solutions.
 
+## Installing Graphviz
+https://graphviz.gitlab.io/download/
+
 # Why?
 
 - epidemiological models

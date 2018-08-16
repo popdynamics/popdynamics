@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
-
-
 """
 Base Population Model to handle different type of models
 """
 
 from __future__ import print_function
+from __future__ import division
+from builtins import zip
+from builtins import range
+from builtins import object
+from past.utils import old_div
+
 import os
 import sys
 import math
@@ -19,12 +23,6 @@ try:
     from scipy.integrate import odeint
 except:
     print("Unable to load scipy")
-
-try:
-    from graphviz import Digraph
-except:
-    print("Unable to load graphviz")
-
 
 # General file-handling methods for use in examples
 
@@ -112,7 +110,7 @@ def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplie
         # check for large values that will blow out exp
         if arg > 10.:
             return y_low
-        return amplitude / (1. + math.exp(arg)) + y_low
+        return old_div(amplitude, (1. + math.exp(arg))) + y_low
 
     return curve
 
@@ -160,7 +158,7 @@ def pick_event(event_intervals):
     return i_event
 
 
-class BaseModel:
+class BaseModel(object):
     """
     Basic concepts
       vars - values that are calculated at every time step
@@ -269,7 +267,7 @@ class BaseModel:
 
         self.times = []
         step = start
-        delta = (end - start) / float(n)
+        delta = old_div((end - start), float(n))
         while step <= end:
             self.times.append(step)
             step += delta
@@ -299,7 +297,7 @@ class BaseModel:
             val: Value (generally float) for the parameter
         """
 
-        assert type(label) is str, 'Parameter name is not string'
+        assert type(label) is str, 'Parameter name "%s" is not string' % label
         assert type(val) is float or type(val) is int, 'Fixed parameter value is not numeric for %' % label
         self.params[label] = val
 
@@ -425,7 +423,7 @@ class BaseModel:
         (to be called within the integration process).
         """
 
-        for label, fn in self.scaleup_fns.iteritems(): 
+        for label, fn in self.scaleup_fns.items(): 
             self.vars[label] = fn(self.time)
 
     def calculate_vars(self):
@@ -660,7 +658,7 @@ class BaseModel:
                 i_event = pick_event(event_rates)
 
                 total_rate = sum(event_rates)
-                dt = - math.log(random.random()) / total_rate
+                dt = old_div(- math.log(random.random()), total_rate)
 
                 from_label, to_label, rate = self.events[i_event]
                 if from_label and to_label:
@@ -778,7 +776,7 @@ class BaseModel:
             # only set after self.calculate_diagnostic_vars has been run so that we have all var_labels,
             # including the ones in calculate_diagnostic_vars
             if self.var_labels is None:
-                self.var_labels = self.vars.keys()
+                self.var_labels = list(self.vars.keys())
                 self.var_array = numpy.zeros((n_time, len(self.var_labels)))
                 self.flow_array = numpy.zeros((n_time, len(self.labels)))
 
@@ -791,7 +789,7 @@ class BaseModel:
         self.fraction_soln = {}
         for label in self.labels:
             self.fraction_soln[label] = [
-                v / t
+                old_div(v, t)
                 for v, t
                 in zip(
                     self.population_soln[label],
@@ -883,6 +881,12 @@ class BaseModel:
             png: String for the filename of the file for the diagram to be stored in
         """
 
+        try:
+            from graphviz import Digraph
+        except:
+            print("Cannot make flow-chart as graphviz was not loaded")
+            return
+
         styles = {
             'graph': {
                 'fontsize': '14',
@@ -919,10 +923,6 @@ class BaseModel:
         def num_str(f):
 
             return '%.3g' % f
-
-        if 'graphviz' not in sys.modules:
-            print("Cannot make flow-chart as graphviz was not loaded")
-            return
 
         self.graph = Digraph(format='png')
         for label in self.labels:
