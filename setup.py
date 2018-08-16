@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='popdynamics',
-    version='0.1',
+    version='0.5',
     description='Framework for epidemiological modelling',
     url='http://github.com/popdynamics/popdynamics',
     author='Bosco Ho',
@@ -16,4 +16,4 @@ setup(
       'graphviz',
       'future'
     ],
-    zip_safe=False)
+    zip_safe=True)

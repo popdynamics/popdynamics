@@ -23,10 +23,12 @@ Suggestion to get started:
  active case finding).
 """
 
+from __future__ import print_function
 from __future__ import division
 from builtins import map
 from past.utils import old_div
 
+# hack to allow basepop to be loaded from the parent directory
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))

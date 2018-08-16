@@ -1,5 +1,5 @@
 """
-The following file creates and executes models with SIR and SEIR structures. It then graphs the results and presents the
+The following file creates and executes models with SEIR structures. It then graphs the results and presents the
 models' underlying compartmental structure.
 
 Although the structure of these models are simple and widely accepted, the specific parameter values are taken from the
@@ -8,19 +8,11 @@ following text:
 available at http://www.anintroductiontoinfectiousdiseasemodelling.com/ with Excel-based model solutions.
 
 It uses methods from the basepop.BaseModel class in the basepop.py file from this module (one directory above) to create the
-model objects for SIR and SEIR models.
+model objects for SEIR models.
 
 The purpose of this file is to present examples of how such models can be built in Python within this popdynamics
 module. Specifically, the user should note how inherited methods from basepop.BaseModel are used to ensure processes such as
 compartment initiation and setting of flows (entry, transfer and exit) are performed correctly.
-
-The first section of the code (to line 116) presents static functions for use in the master script.
-
-The second section of the code (from line 119 to line 336) presents the creation of the model classes for SIR and
-SEIR models.
-
-The last section of the code (from line 336 to the end of the script) presents the execution of the example models and
-calls the functions to graph their outputs.
 
 Suggestion to get started:
 - Adjust some parameters within the dictionaries of parameter values in infection_param_dictionaries in line 317 and
@@ -29,17 +21,23 @@ Suggestion to get started:
  the recovery transition to move patients from infectious to susceptible (rather than recovered).
 """
 
+from __future__ import print_function
 from __future__ import division
 from builtins import zip
 from past.utils import old_div
 
-# hack to allow basepop to be loaded from the examples directory
+# hack to allow basepop to be loaded from the parent directory
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 import basepop
 
 import pylab
+
+
+###################################
+# Plotting functions
+###################################
 
 
 def plot_epidemiological_indicators(model, infection, indicators, out_dir, ylog=False):
@@ -98,72 +96,11 @@ def plot_compartment_proportions(model, infection):
 
 
 ###################################
-### Define model object classes ###
+# Define model object classes
 ###################################
 
 
-class SirModel(basepop.BaseModel):
-    """
-    Based on the SIR models from Vynnycky and White Chapter 2
-    and the corresponding on-line Excel difference equation-based models for measles and for flu.
-    """
-
-    def __init__(self, param_dictionary):
-        """
-        Takes a single dictionary of the parameter values to run the SIR model in order that the rest of the SIR
-        model code can remain the same.
-
-        Inputs:
-            param sir_param_dictionary: Dictionary with keys as follows:
-                population:             Total population size
-                start_infectious:       Number of infectious individuals at start of simulation
-                r0:                     The R0 value for the infecion
-                duration_infectious:    Number of days spent in the infectious compartment
-        """
-
-        basepop.BaseModel.__init__(self)
-
-        # set starting compartment values
-        self.set_compartment('susceptible',
-                             param_dictionary['population'] - param_dictionary['start_infectious'])
-        self.set_compartment('infectious', param_dictionary['start_infectious'])
-        self.set_compartment('immune', 0.)
-
-        # set model parameters
-        self.set_param('infection_beta',
-                       old_div(param_dictionary['r0'], (param_dictionary['duration_infectious'] * param_dictionary['population'])))
-        self.set_param('infection_rate_recover', old_div(1., param_dictionary['duration_infectious']))
-
-    def calculate_vars(self):
-
-        # track total population size
-        self.vars['population'] = sum(self.compartments.values())
-
-        # calculate force of infection from beta (which was derived from R0 above)
-        self.vars['rate_force'] = self.params['infection_beta'] * self.compartments['infectious']
-
-    def set_flows(self):
-
-        # set variable infection transition flow
-        self.set_var_transfer_rate_flow('susceptible', 'infectious', 'rate_force')
-
-        # set fixed inter-compartmental flows
-        self.set_fixed_transfer_rate_flow('infectious', 'immune', 'infection_rate_recover')
-
-    def calculate_diagnostic_vars(self):
-
-        # calculate incidence
-        self.vars['incidence'] = 0.
-        for from_label, to_label, rate in self.var_transfer_rate_flows:
-            val = self.compartments[from_label] * self.vars[rate]
-            if 'infectious' in to_label:
-                self.vars['incidence'] += old_div(val, self.vars['population'])
-
-        # calculate prevalence
-        self.vars['prevalence'] = old_div(self.compartments['infectious'], self.vars['population'])
-
-
-class SeirModel(SirModel):
+class SeirModel(basepop.BaseModel):
     """
     Based on the SEIR models from Vynnycky and White Chapters 2 and 3 and the corresponding online Excel difference
     equation-based models for measles and for flu.
@@ -289,11 +226,14 @@ class SeirDemographyModel(SeirModel):
         self.vars['rate_force'] = self.params['infection_beta'] * self.compartments['infectious']
 
 
-######################################
-### Create and run SIR/SEIR models ###
-######################################
+#############################
+# Run models
+#############################
 
-# define parameter values for the main two SEIR infections - measles and influenza
+
+######################################
+# Define parameters for infections
+
 infection_param_dictionaries = {
     'measles':
         {'population': 1e6,
@@ -313,28 +253,10 @@ infection_param_dictionaries = {
 
 
 #############################
-### Create and run models ###
-#############################
-
-#############################
-# SIR and SEIR models
+# straight SEIR
 
 # loop over the two infections with their respective parameters
 for infection in ['flu', 'measles']:
-
-    # SIR
-    model = SirModel(infection_param_dictionaries[infection])
-    model.make_times(0, 200, 1)
-    model.integrate('explicit')
-
-    # set output directory
-    out_dir = infection + '_sir_graphs'
-    basepop.ensure_out_dir(out_dir)
-
-    # plot results
-    model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
-    plot_epidemiological_indicators(model, infection, ['incidence', 'prevalence'], out_dir)
-    plot_compartment_sizes(model)
 
     # SEIR
     # model equivalent to that presented in spreadsheets "model 2.1", "model 2.1a" and "model 3.1" of the online
@@ -362,6 +284,7 @@ for infection in ['flu', 'measles']:
 
     # open output directory
     basepop.open_pngs_in_dir(out_dir)
+
 
 #############################
 # SEIR with demography
@@ -436,6 +359,10 @@ ax2.set_ylim([0.88, 0.96])
 ax2.legend(loc=0)
 fig.savefig(os.path.join(out_dir, 'cyclical_prop_immune.png'))
 
+# open output directory
+basepop.open_pngs_in_dir(out_dir)
+
+
 #############################
 # SEIR with partial population immunity
 # equivalent to figure from "model 4.2" spreadsheet in Vynnycky and White (note population sizes different and
@@ -461,3 +388,6 @@ model.integrate('explicit')
 out_dir = 'partial_immunity_graphs'
 basepop.ensure_out_dir(out_dir)
 plot_compartment_sizes(model)
+
+# open output directory
+basepop.open_pngs_in_dir(out_dir)

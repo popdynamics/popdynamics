@@ -1,6 +1,13 @@
 """
 Michael Meehan's competitive-strain SIR model.
 
+This demonstrates how to set up a stochastic continous-time model of
+two competitive strain SIR models.
+
+There are two infection strains - resident and invader.
+They have different r0 - r0_resident and r0_invader.
+The model starts off with 1 invader with a more effective r0.
+
 @author: Bosco Ho, December 2017
 """
 
@@ -9,21 +16,19 @@ from __future__ import division
 from builtins import range
 from past.utils import old_div
 
-# hack to allow basepop to be loaded from the examples directory
+# hack to allow basepop to be loaded from the parent directory
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
-from basepop import BaseModel
+import basepop
 
-import platform
-import glob
 import math
 
 import pylab
 import matplotlib
 
 
-class StrainsModel(BaseModel):
+class StrainsModel(basepop.BaseModel):
     """
     Michael Meehan's competitive strain models SIR model.
 
@@ -42,7 +47,7 @@ class StrainsModel(BaseModel):
     """
 
     def __init__(self, input_params=None):
-        BaseModel.__init__(self)
+        basepop.BaseModel.__init__(self)
 
         if input_params is None:
             input_params = {}
@@ -179,13 +184,13 @@ for i_sim in range(n_replica):
 
 # Set output directory
 
-infection = "strains"
-out_dir = infection + "_sir_graphs"
-if not os.path.isdir(out_dir):
-    os.makedirs(out_dir)
+out_dir = "strains_sir_graphs"
+basepop.ensure_out_dir(out_dir)
 
 
 # Create probability of extinction graph
+
+pylab.clf()
 
 extinction = []
 for model in models:
@@ -195,8 +200,6 @@ for model in models:
 
 params = models[0].params
 asymptotic_prob_extinction = 1.0 * params["r0_resident"] / params["r0_invader"]
-
-pylab.clf()
 
 prob_extinction = []
 n_replica_range = list(range(1, n_replica))
@@ -217,9 +220,9 @@ pylab.savefig(os.path.join(out_dir, "extinction.png"))
 # Create population overlay graphs
 
 pylab.clf()
+
 y_max = 0
 
-print("Making png")
 cm = matplotlib.cm.get_cmap("Pastel1")
 colors = []
 for name in "bgrykcm":
@@ -249,11 +252,6 @@ pylab.savefig(os.path.join(out_dir, "compartment_sizes.png"))
 models[0].make_graph(os.path.join(out_dir, "flow_diagram"))
 
 
-# Open output images for convenience
+# Open the figures
 
-pngs = glob.glob(os.path.join(out_dir, "*png"))
-operating_system = platform.system()
-if "Windows" in operating_system:
-    os.system("start " + " ".join(pngs))
-elif "Darwin" in operating_system:
-    os.system("open " + " ".join(pngs))
+basepop.open_pngs_in_dir(out_dir)

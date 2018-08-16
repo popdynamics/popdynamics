@@ -1,40 +1,43 @@
 """
+The following file creates and executes models with SIR structure. It
+then graphs the results and presents the models" underlying
+compartmental structure.
 
-The following file creates and executes models with SIR and SEIR structures. It then graphs the results and presents the
-models" underlying compartmental structure.
+Although the structure of the model are simple and widely accepted,
+the specific parameter values are taken from the following text: "An
+Introduction to Infectious Disease Modelling" by Emilia Vynnycky and
+Richard G White available at
+http://www.anintroductiontoinfectiousdiseasemodelling.com/ with Excel-
+based model solutions.
 
-Although the structure of these models are simple and widely accepted, the specific parameter values are taken from the
-following text:
-"An Introduction to Infectious Disease Modelling" by Emilia Vynnycky and Richard G White
-available at http://www.anintroductiontoinfectiousdiseasemodelling.com/ with Excel-based model solutions.
+It uses methods from the BaseModel class in the basepop.py file from
+this module (one directory above) to create the model objects for SIR
+and SEIR models.
 
-It uses methods from the basepop.BaseModel class in the basepop.py file from this module (one directory above) to create the
-model objects for SIR and SEIR models.
-
-The purpose of this file is to present examples of how such models can be built in Python within this popdynamics
-module. Specifically, the user should note how inherited methods from basepop.BaseModel are used to ensure processes such as
-compartment initiation and setting of flows (entry, transfer and exit) are performed correctly.
-
-The first section of the code (to line 116) presents static functions for use in the master script.
-
-The second section of the code (from line 119 to line 336) presents the creation of the model classes for SIR and
-SEIR models.
-
-The last section of the code (from line 336 to the end of the script) presents the execution of the example models and
-calls the functions to graph their outputs.
+The purpose of this file is to present examples of how such models can
+be built in Python within this popdynamics module. Specifically, the
+user should note how inherited methods from BaseModel are used to
+ensure processes such as compartment initiation and setting of flows
+(entry, transfer and exit) are performed correctly.
 
 Suggestion to get started:
-- Adjust some parameters within the dictionaries of parameter values in infection_param_dictionaries in line 317 and
- observe how model outputs change.
-- Try adapting the SEIR model without demography to an SEIS model, by removing the recovered compartment and changing
- the recovery transition to move patients from infectious to susceptible (rather than recovered).
 
+- Adjust some parameters within the dictionaries of parameter values
+in infection_param_dictionaries in line 317 and observe how model
+outputs change.
+
+- Try adapting the SEIR model without demography to an SEIS model, by
+removing the recovered compartment and changing the recovery
+transition to move patients from infectious to susceptible (rather
+than recovered).
 """
+
+from __future__ import print_function
 from __future__ import division
 from builtins import zip
 from past.utils import old_div
 
-# hack to allow basepop to be loaded from the examples directory
+# # hack to allow basepop to be loaded from the parent directory
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
@@ -43,85 +46,9 @@ import basepop
 import pylab
 
 
-def plot_epidemiological_indicators(model, indicators, out_dir, ylog=False):
-    """
-    Plot epidemiological outputs recorded in the model object.
-
-    :param indicators: list of epidemiological indicators within the model"s var attribute
-    """
-    pylab.clf()
-    for var_key in indicators:
-        if not ylog:
-            pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
-        else:
-            pylab.semilogy(model.times, model.get_var_soln(var_key), label=var_key)
-    pylab.legend()
-    pylab.ylabel("per day (except prevalence), per person")
-    pylab.title("Indicators")
-    if not ylog:
-        pylab.savefig(os.path.join(out_dir, "indicators.png"))
-    else:
-        pylab.savefig(os.path.join(out_dir, "log_indicators.png"))
-
-
-def plot_compartment_sizes(model, out_dir):
-    pylab.clf()
-    y_max = 0
-    for compartment in model.compartments:
-        soln = model.get_compartment_soln(compartment)
-        pylab.plot(model.times, soln, label=compartment)
-        y_max = max(soln.max(), y_max)
-    pylab.ylim([0, y_max*1.1])
-    pylab.legend()
-    pylab.ylabel("persons")
-    pylab.title("Populations")
-    pylab.savefig(os.path.join(out_dir, "compartment_sizes.png"))
-
-
-def plot_compartment_proportions(model, out_dir):
-    pylab.clf()
-    for compartment in model.compartments:
-        sizes = model.get_compartment_soln(compartment)
-        populations = model.get_var_soln("population")
-        proportions = [old_div(i, j) for i, j in zip(sizes, populations)]
-        pylab.plot(model.times, proportions, label=compartment)
-    pylab.title("Compartment proportions")
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, "proportions.png"))
-
-
-def plot_rn(model, r0, out_dir):
-    pylab.clf()
-    susceptibles = model.get_compartment_soln("susceptible")
-    populations = model.get_var_soln("population")
-    proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
-    r_n = [p * r0 for p in proportions]
-    pylab.plot(model.times, r_n, label="Rn")
-    pylab.title("Rn")
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, "rn.png"))
-
-
-def generate_output(model, infection):
-    # ensure creation of directory for output
-    out_dir = infection + "_sir_graphs"
-    if not os.path.isdir(out_dir):
-        os.makedirs(out_dir)
-
-    # create the flow diagram of the model
-    model.make_graph(os.path.join(out_dir, "flow_diagram"))
-
-    indicators = ["incidence", "prevalence"]
-    plot_epidemiological_indicators(model, indicators, out_dir)
-
-    plot_compartment_sizes(model, out_dir)
-    plot_compartment_proportions(model, out_dir)
-
-    plot_rn(model, model.params["r0"], out_dir)
-
-    basepop.open_pngs_in_dir(out_dir)
-
-
+#######################################################
+# This shows the creation of the SIR Model
+#######################################################
 
 class SirModel(basepop.BaseModel):
     """
@@ -145,7 +72,6 @@ class SirModel(basepop.BaseModel):
                 infectious compartment
         }
         """
-
         basepop.BaseModel.__init__(self)
 
         # define compartments and set their starting values
@@ -221,7 +147,93 @@ class SirModel(basepop.BaseModel):
             old_div(self.compartments["infectious"], self.vars["population"])
 
 
+#######################################################
+# Plotting functions for the model
+#######################################################
+
+def plot_epidemiological_indicators(model, indicators, out_dir, ylog=False):
+    """
+    Plot epidemiological outputs recorded in the model object.
+
+    :param indicators: list of epidemiological indicators within the model"s var attribute
+    """
+    pylab.clf()
+    for var_key in indicators:
+        if not ylog:
+            pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
+        else:
+            pylab.semilogy(model.times, model.get_var_soln(var_key), label=var_key)
+    pylab.legend()
+    pylab.ylabel("per day (except prevalence), per person")
+    pylab.title("Indicators")
+    if not ylog:
+        pylab.savefig(os.path.join(out_dir, "indicators.png"))
+    else:
+        pylab.savefig(os.path.join(out_dir, "log_indicators.png"))
+
+
+def plot_compartment_sizes(model, out_dir):
+    pylab.clf()
+    y_max = 0
+    for compartment in model.compartments:
+        soln = model.get_compartment_soln(compartment)
+        pylab.plot(model.times, soln, label=compartment)
+        y_max = max(soln.max(), y_max)
+    pylab.ylim([0, y_max*1.1])
+    pylab.legend()
+    pylab.ylabel("persons")
+    pylab.title("Populations")
+    pylab.savefig(os.path.join(out_dir, "compartment_sizes.png"))
+
+
+def plot_compartment_proportions(model, out_dir):
+    pylab.clf()
+    for compartment in model.compartments:
+        sizes = model.get_compartment_soln(compartment)
+        populations = model.get_var_soln("population")
+        proportions = [old_div(i, j) for i, j in zip(sizes, populations)]
+        pylab.plot(model.times, proportions, label=compartment)
+    pylab.title("Compartment proportions")
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, "proportions.png"))
+
+
+def plot_rn(model, r0, out_dir):
+    pylab.clf()
+    susceptibles = model.get_compartment_soln("susceptible")
+    populations = model.get_var_soln("population")
+    proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
+    r_n = [p * r0 for p in proportions]
+    pylab.plot(model.times, r_n, label="Rn")
+    pylab.title("Rn")
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, "rn.png"))
+
+
+def generate_output(model, infection):
+    out_dir = infection + "_sir_graphs"
+    basepop.ensure_out_dir(out_dir)
+
+    # create the flow diagram of the model
+    model.make_graph(os.path.join(out_dir, "flow_diagram"))
+
+    indicators = ["incidence", "prevalence"]
+    plot_epidemiological_indicators(model, indicators, out_dir)
+
+    plot_compartment_sizes(model, out_dir)
+    plot_compartment_proportions(model, out_dir)
+
+    plot_rn(model, model.params["r0"], out_dir)
+
+    basepop.open_pngs_in_dir(out_dir)
+
+
+#######################################################
+# The main routine
+#######################################################
+
 flu_params = {
+    "name": "flu",
     "population": 1e6,
     "start_infectious": 1.,
     "r0": 2.,
@@ -231,6 +243,7 @@ flu_params = {
 }
 
 measles_params = {
+    "name": "measles",
     "population": 1e6,
     "start_infectious": 1.,
     "r0": 12.,
@@ -239,12 +252,10 @@ measles_params = {
     "life_expectancy": 70. * 365.
 }
 
-
-model = SirModel(measles_params)
-model.make_times(0, 100, 1)
-model.integrate()
-
-# example graph generation
-generate_output(model, "measles")
+for params in [flu_params, measles_params]:
+    model = SirModel(params)
+    model.make_times(0, 100, 1)
+    model.integrate()
+    generate_output(model, params["name"])
 
 

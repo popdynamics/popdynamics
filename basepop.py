@@ -24,6 +24,7 @@ try:
 except:
     print("Unable to load scipy")
 
+
 # General file-handling methods for use in examples
 
 def ensure_out_dir(out_dir):
@@ -76,7 +77,7 @@ def label_intersects_tags(label, tags):
             return True
     return False
 
-# Math functions for more comples scale-up functions
+# Math functions to build scale-up functions
 
 def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
     """
@@ -544,7 +545,7 @@ class BaseModel(object):
         if method == 'explicit':
             self.integrate_explicit(y, derivative)
         elif method == 'scipy':
-            if 'odeint' not in sys.modules:
+            if 'scipy' not in sys.modules:
                 raise Exception("scipy module was not loaded")
             self.soln_array = odeint(derivative, y, self.times)
         self.calculate_diagnostics()
@@ -945,7 +946,7 @@ class BaseModel(object):
         try:
             self.graph.render(base)
         except:
-            print("Error running graphviz: graphviz probably not installed on your system")
+            print("Error running graphviz: probably not installed on your system")
 
     def check_converged_compartment_fraction(self, label, equil_time, test_fraction_diff):
         """

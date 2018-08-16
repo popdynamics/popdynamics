@@ -7,7 +7,7 @@ from __future__ import division
 from builtins import range
 from past.utils import old_div
 
-# hack to allow basepop to be loaded from the examples directory
+# hack to allow basepop to be loaded from the parent directory
 import os
 import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
@@ -15,6 +15,7 @@ import basepop
 
 import numpy
 import pylab
+
 
 class RmitTbModel(basepop.BaseModel):
     def __init__(self, parameters):
@@ -91,78 +92,93 @@ class RmitTbModel(basepop.BaseModel):
 ''' run model '''
 
 
-if __name__ == '__main__':
-    fixed_parameters = {
-        'mu': old_div(1., 70.),
-        'd': .1,
-        'phi': 12,
-        'f': .05,  # not sure whether 0.05 or 0.5?
-        'eta': 2e-4,
-        'tau': old_div(1., 2.),
-        'alpha': old_div(2., 9.),
-        'theta': 1.,
-        'rho': 0.1,
-        'omega': 2e-5,
-    }
-    sigmas = [0., 0., 0.]
+# setup directory
+
+out_dir = 'rmit_tb_graphs'
+basepop.ensure_out_dir(out_dir)
+
+
+# setup parameters
+
+fixed_parameters = {
+    'mu': old_div(1., 70.),
+    'd': .1,
+    'phi': 12,
+    'f': .05,  # not sure whether 0.05 or 0.5?
+    'eta': 2e-4,
+    'tau': old_div(1., 2.),
+    'alpha': old_div(2., 9.),
+    'theta': 1.,
+    'rho': 0.1,
+    'omega': 2e-5,
+}
+sigmas = [0., 0., 0.]
+sigmas_dict = {}
+for sigma in range(len(sigmas)):
+    sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
+fixed_parameters.update(sigmas_dict)
+
+
+# figure 2
+
+betas = list(numpy.linspace(1., 99., 99))
+betas += list(numpy.linspace(100., 500., 51))
+proportions = []
+for beta in betas:
+    print('beta', float(beta))
+    model = RmitTbModel(fixed_parameters)
+    model.set_param('beta', float(beta))
+    model.make_times(0, 500., 1.)
+    model.integrate(method='explicit')
+    proportions.append(model.vars['proportion'])
+
+pylab.clf()
+pylab.semilogy(betas, proportions)
+text = r''
+for sigma in range(len(sigmas)):
+    text += r'$\sigma_' + str(sigma + 1) + '$=%.0f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+pylab.text(400., 1e-2, text)
+pylab.ylabel('proportion of infectives, I')
+pylab.xlabel(r'transmission coefficient, $\beta$')
+pylab.ylim([9e-7, 1.])
+pylab.legend()
+pylab.savefig(os.path.join(out_dir, 'figure_2.png'))
+
+
+# figure 8
+
+sets_of_sigmas = {'a': [0.25, 0.125, 0.125], 'b': [0.25, 0.5, 0.5]}
+for fig_letter in sets_of_sigmas:
+    pylab.clf()
+    sigmas = sets_of_sigmas[fig_letter]
     sigmas_dict = {}
     for sigma in range(len(sigmas)):
         sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
     fixed_parameters.update(sigmas_dict)
-
-    # figure 2
-    betas = list(numpy.linspace(1., 99., 99))
-    betas += list(numpy.linspace(100., 500., 51))
-    proportions = []
-    for beta in betas:
-        print('beta', float(beta))
-        model = RmitTbModel(fixed_parameters)
-        model.set_param('beta', float(beta))
-        model.make_times(0, 500., 1.)
-        model.integrate(method='explicit')
-        proportions.append(model.vars['proportion'])
-    out_dir = 'rmit_tb_graphs'
-    pylab.clf()
-    pylab.semilogy(betas, proportions)
+    fixed_parameters['tau'] = 2.
+    for rho in [0., 0.5, 1., 10.]:
+        proportions = []
+        for beta in betas:
+            print('rho', float(rho), 'beta', float(beta))
+            model = RmitTbModel(fixed_parameters)
+            model.set_param('beta', float(beta))
+            model.set_param('rho', float(rho))
+            model.make_times(0, 500., 1.)
+            model.integrate(method='explicit')
+            proportions.append(model.vars['proportion'])
+        pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
     text = r''
     for sigma in range(len(sigmas)):
-        text += r'$\sigma_' + str(sigma + 1) + '$=%.0f\n' % sigmas_dict['sigma' + str(sigma + 1)]
-    pylab.text(400., 1e-2, text)
+        text += r'$\sigma_' + str(sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+    pylab.text(400., 1e-4, text)
     pylab.ylabel('proportion of infectives, I')
     pylab.xlabel(r'transmission coefficient, $\beta$')
     pylab.ylim([9e-7, 1.])
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'figure_2.png'))
+    pylab.legend(frameon=False, loc=8)
+    pylab.savefig(os.path.join(out_dir, 'figure_8' + fig_letter + '.png'))
 
-    # figure 8
-    sets_of_sigmas = {'a': [0.25, 0.125, 0.125], 'b': [0.25, 0.5, 0.5]}
-    for fig_letter in sets_of_sigmas:
-        pylab.clf()
-        sigmas = sets_of_sigmas[fig_letter]
-        sigmas_dict = {}
-        for sigma in range(len(sigmas)):
-            sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
-        fixed_parameters.update(sigmas_dict)
-        fixed_parameters['tau'] = 2.
-        for rho in [0., 0.5, 1., 10.]:
-            proportions = []
-            for beta in betas:
-                print('rho', float(rho), 'beta', float(beta))
-                model = RmitTbModel(fixed_parameters)
-                model.set_param('beta', float(beta))
-                model.set_param('rho', float(rho))
-                model.make_times(0, 500., 1.)
-                model.integrate(method='explicit')
-                proportions.append(model.vars['proportion'])
-            pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
-        text = r''
-        for sigma in range(len(sigmas)):
-            text += r'$\sigma_' + str(sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(sigma + 1)]
-        pylab.text(400., 1e-4, text)
-        pylab.ylabel('proportion of infectives, I')
-        pylab.xlabel(r'transmission coefficient, $\beta$')
-        pylab.ylim([9e-7, 1.])
-        pylab.legend(frameon=False, loc=8)
-        pylab.savefig(os.path.join(out_dir, 'figure_8' + fig_letter + '.png'))
-        basepop.open_pngs_in_dir(out_dir)
+
+# Open images
+
+basepop.open_pngs_in_dir(out_dir)
 
