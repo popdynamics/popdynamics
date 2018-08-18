@@ -44,11 +44,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 import basepop
 
 import pylab
+import matplotlib
 
-
-#######################################################
-# This shows the creation of the SIR Model
-#######################################################
+# Create the SIR Model Object
 
 class SirModel(basepop.BaseModel):
     """
@@ -147,104 +145,111 @@ class SirModel(basepop.BaseModel):
             old_div(self.compartments["infectious"], self.vars["population"])
 
 
-#######################################################
+
 # Plotting functions for the model
-#######################################################
 
-def plot_epidemiological_indicators(model, indicators, out_dir, ylog=False):
+def plot_overlays(times, solutions, ylabel, title, png):
     """
-    Plot epidemiological outputs recorded in the model object.
+    :param times: list of [Float]
+    :param solutions: list of ["key": Array(Float)]
+    :param png: string
+    """
+    colors = []
+    for name in "bgrykcm":
+        rgb = matplotlib.colors.colorConverter.to_rgb(name)
+        if len(solutions) > 1:
+            rgba = list(rgb) + [0.1]
+            colors.append(rgba)
+        else:
+            colors.append(rgb)
 
+    pylab.clf()
+
+    y_max = 0
+    for i_soln, soln in enumerate(solutions):
+        for i_key, key in enumerate(soln):
+            y_vals = soln[key]
+            color = colors[i_key % len(colors)]
+            if i_soln == 0:
+                # generate a fake dot so that legend can extract color/label
+                pylab.plot([0], [0], label=key, color=color[:3])
+            pylab.plot(times, y_vals, linewidth=2, color=color)
+            y_max = max(max(y_vals), y_max)
+
+    pylab.ylim([0, y_max * 1.1])
+    pylab.legend()
+    pylab.ylabel(ylabel)
+    pylab.title(title)
+
+    pylab.savefig(png)
+
+
+def plot_epidemiological_indicators(models, png):
+    """
     :param indicators: list of epidemiological indicators within the model"s var attribute
     """
-    pylab.clf()
-    for var_key in indicators:
-        if not ylog:
-            pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
-        else:
-            pylab.semilogy(model.times, model.get_var_soln(var_key), label=var_key)
-    pylab.legend()
-    pylab.ylabel("per day (except prevalence), per person")
-    pylab.title("Indicators")
-    if not ylog:
-        pylab.savefig(os.path.join(out_dir, "indicators.png"))
-    else:
-        pylab.savefig(os.path.join(out_dir, "log_indicators.png"))
-
-
-def plot_compartment_sizes(model, out_dir):
-    pylab.clf()
-    y_max = 0
-    for compartment in model.compartments:
-        soln = model.get_compartment_soln(compartment)
-        pylab.plot(model.times, soln, label=compartment)
-        y_max = max(soln.max(), y_max)
-    pylab.ylim([0, y_max*1.1])
-    pylab.legend()
-    pylab.ylabel("persons")
-    pylab.title("Populations")
-    pylab.savefig(os.path.join(out_dir, "compartment_sizes.png"))
-
-
-def plot_compartment_proportions(model, out_dir):
-    pylab.clf()
-    for compartment in model.compartments:
-        sizes = model.get_compartment_soln(compartment)
-        populations = model.get_var_soln("population")
-        proportions = [old_div(i, j) for i, j in zip(sizes, populations)]
-        pylab.plot(model.times, proportions, label=compartment)
-    pylab.title("Compartment proportions")
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, "proportions.png"))
-
-
-def plot_rn(model, r0, out_dir):
-    pylab.clf()
-    susceptibles = model.get_compartment_soln("susceptible")
-    populations = model.get_var_soln("population")
-    proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
-    r_n = [p * r0 for p in proportions]
-    pylab.plot(model.times, r_n, label="Rn")
-    pylab.title("Rn")
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, "rn.png"))
-
-
-def generate_output(model, infection):
-    out_dir = infection + "_sir_graphs"
-    basepop.ensure_out_dir(out_dir)
-
-    # create the flow diagram of the model
-    model.make_graph(os.path.join(out_dir, "flow_diagram"))
-
     indicators = ["incidence", "prevalence"]
-    plot_epidemiological_indicators(model, indicators, out_dir)
+    solutions = []
+    for model in models:
+        solution = {}
+        for indicator in indicators:
+            solution[indicator] = model.get_var_soln(indicator)
+        solutions.append(solution)
+        times = model.times
+    plot_overlays(
+        times, solutions, "per day (except prevalence), per person",
+        "Indicators", png)
 
-    plot_compartment_sizes(model, out_dir)
-    plot_compartment_proportions(model, out_dir)
 
-    plot_rn(model, model.params["r0"], out_dir)
+def plot_rn(models, png):
+    solutions = []
+    for model in models:
+        r0 = model.params["r0"]
+        times = model.times
+        susceptibles = model.get_compartment_soln("susceptible")
+        populations = model.get_var_soln("population")
+        proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
+        solution = {"Rn": [p * r0 for p in proportions]}
+        solutions.append(solution)
+    plot_overlays(times, solutions, "", "Rn", png)
 
-    basepop.open_pngs_in_dir(out_dir)
+
+def plot_populations(models, png):
+    solutions = []
+    for model in models:
+        solution = {}
+        for key in model.compartments.keys():
+            solution[key] = model.get_compartment_soln(key)
+        solutions.append(solution)
+    plot_overlays(models[0].times, solutions, "persons", "Populations", png)
 
 
-#######################################################
+def generate_output(models, out_dir, modifier):
+    models[0].make_flow_diagram_png(
+        os.path.join(out_dir, "flow_diagram"))
+    plot_epidemiological_indicators(
+        models, os.path.join(out_dir, modifier + "_indicators.png"))
+    plot_populations(
+        models, os.path.join(out_dir, modifier + "_compartment_sizes.png"))
+    plot_rn(
+        models, os.path.join(out_dir, modifier + "_rn.png"))
+
+
 # The main routine
-#######################################################
 
-flu_params = {
-    "name": "flu",
-    "population": 1e6,
-    "start_infectious": 1.,
-    "r0": 2.,
-    "duration_preinfectious": 2.,
-    "duration_infectious": 2.,
-    "life_expectancy": 70. * 365.
-}
+# flu_params = {
+#     "name": "flu",
+#     "population": 500,
+#     "start_infectious": 1.,
+#     "r0": 2.,
+#     "duration_preinfectious": 2.,
+#     "duration_infectious": 2.,
+#     "life_expectancy": 70. * 365.
+# }
 
-measles_params = {
+params = {
     "name": "measles",
-    "population": 1e6,
+    "population": 200,
     "start_infectious": 1.,
     "r0": 12.,
     "duration_preinfectious": 8.,
@@ -252,11 +257,35 @@ measles_params = {
     "life_expectancy": 70. * 365.
 }
 
-for params in [flu_params, measles_params]:
-    model = SirModel(params)
-    model.make_times(0, 100, 1)
-    model.integrate()
-    # model.integrate_discrete_time_stochastic()
-    generate_output(model, params["name"])
+out_dir = params["name"] + "_sir_graphs"
+basepop.ensure_out_dir(out_dir)
+
+model = SirModel(params)
+model.make_times(0, 50, 1)
+model.integrate()
+generate_output([model], out_dir, 'explicit')
+
+# stochastic continuous-time models
+n_replica = 20
+models = []
+for i in range(n_replica):
+    new_model = SirModel(params)
+    new_model.make_times(0, 50, 1)
+    new_model.integrate_continuous_stochastic()
+    models.append(new_model)
+generate_output(models, out_dir, "discrete")
+
+# stochastic discrete-time models
+n_replica = 20
+models = []
+for i in range(n_replica):
+    new_model = SirModel(params)
+    new_model.make_times(0, 50, 1)
+    new_model.integrate_continuous_stochastic()
+    models.append(new_model)
+generate_output(models, out_dir, "continuous")
+
+
+basepop.open_pngs_in_dir(out_dir)
 
 

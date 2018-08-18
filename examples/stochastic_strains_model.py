@@ -167,6 +167,60 @@ class StrainsModel(basepop.BaseModel):
                 self.vars["prevalence"] += old_div(val, self.vars["population"])
 
 
+def plot_population_overlays(models, png):
+    colors = []
+    for name in "bgrykcm":
+        rgb = matplotlib.colors.colorConverter.to_rgb(name)
+        rgba = list(rgb) + [0.1]
+        colors.append(rgba)
+
+    pylab.clf()
+
+    y_max = 0
+    for i_model, model in enumerate(models):
+        for i, compartment in enumerate(model.compartments):
+            soln = model.get_compartment_soln(compartment)
+            color = colors[i % len(colors)]
+            if i_model == 0:
+                pylab.plot([0], [0], label=compartment, color=color[:3])
+            pylab.plot(model.times, soln, linewidth=2, color=color)
+            y_max = max(soln.max(), y_max)
+
+    pylab.ylim([0, y_max * 1.1])
+    pylab.legend()
+    pylab.ylabel("persons")
+    pylab.title("Populations")
+    pylab.savefig(png)
+
+
+def plot_extinction_graph(models, png):
+    extinctions = []
+    for model in models:
+        invader_soln = model.get_compartment_soln("infectious_invader")
+        is_extinct_invader = invader_soln[-1] == 0
+        extinctions.append(is_extinct_invader)
+
+    params = models[0].params
+    asymptotic_prob_extinction = 1.0 * params["r0_resident"] / params["r0_invader"]
+    title = "Comparing to r0_resident/r0_invader = %.3f" % asymptotic_prob_extinction
+
+    n_replica = len(models) # could be less for display purposes
+    prob_extinction = []
+    n_replica_range = list(range(1, n_replica))
+    for n_replica in n_replica_range:
+        n_extinct = extinctions[:n_replica].count(True)
+        prob_extinction.append(1.0 * n_extinct / n_replica)
+
+    pylab.clf()
+    pylab.plot(n_replica_range, prob_extinction)
+    pylab.ylabel("Probability of invader extinction")
+    pylab.ylim([0, max(prob_extinction) * 1.1])
+    pylab.xlabel("Number of replicas run")
+    pylab.title(title)
+
+    pylab.savefig(png)
+
+
 # Run replicas of the model
 
 n_replica = 200
@@ -176,82 +230,18 @@ for i_sim in range(n_replica):
         print("Processed", i_sim, "replicas")
     model = StrainsModel()
     model.make_times(0, 1000, 1)
-    # model.integrate("explicit")
     model.integrate_continuous_stochastic()
-    # model.integrate_discrete_time_stochastic()
     models.append(model)
 
-
-# Set output directory
+# Generate output
 
 out_dir = "strains_sir_graphs"
 basepop.ensure_out_dir(out_dir)
 
+plot_extinction_graph(models, os.path.join(out_dir, "extinction.png"))
 
-# Create probability of extinction graph
+plot_population_overlays(models, os.path.join(out_dir, "compartment_sizes.png"))
 
-pylab.clf()
-
-extinction = []
-for model in models:
-    invader_soln = model.get_compartment_soln("infectious_invader")
-    is_extinct_invader = invader_soln[-1] == 0
-    extinction.append(is_extinct_invader)
-
-params = models[0].params
-asymptotic_prob_extinction = 1.0 * params["r0_resident"] / params["r0_invader"]
-
-prob_extinction = []
-n_replica_range = list(range(1, n_replica))
-for n_replica in n_replica_range:
-    n_extinct = extinction[:n_replica].count(True)
-    prob_extinction.append(1.0 * n_extinct / n_replica)
-
-pylab.plot(n_replica_range, prob_extinction)
-
-pylab.ylabel("Probability of invader extinction")
-pylab.ylim([0, max(prob_extinction)*1.1])
-pylab.xlabel("Number of replicas run")
-pylab.title("Comparing to r0_resident/r0_invader = %.3f" % asymptotic_prob_extinction)
-
-pylab.savefig(os.path.join(out_dir, "extinction.png"))
-
-
-# Create population overlay graphs
-
-pylab.clf()
-
-y_max = 0
-
-cm = matplotlib.cm.get_cmap("Pastel1")
-colors = []
-for name in "bgrykcm":
-    rgb = matplotlib.colors.colorConverter.to_rgb(name)
-    rgba = list(rgb) + [0.1]
-    colors.append(rgba)
-
-for i_model, model in enumerate(models):
-    for i, compartment in enumerate(model.compartments):
-        soln = model.get_compartment_soln(compartment)
-        color = colors[i % len(colors)]
-        if i_model == 0:
-            pylab.plot([0], [0], label=compartment, color=color[:3])
-        pylab.plot(model.times, soln, linewidth=2, color=color)
-        y_max = max(soln.max(), y_max)
-
-pylab.ylim([0, y_max*1.1])
-pylab.legend()
-pylab.ylabel("persons")
-pylab.title("Populations")
-
-pylab.savefig(os.path.join(out_dir, "compartment_sizes.png"))
-
-
-# Create the flow diagram of the model
-
-models[0].make_graph(os.path.join(out_dir, "flow_diagram"))
-
-
-# Open the figures
+models[0].make_flow_diagram_png(os.path.join(out_dir, "flow_diagram"))
 
 basepop.open_pngs_in_dir(out_dir)

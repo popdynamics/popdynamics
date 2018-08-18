@@ -271,7 +271,7 @@ for infection in ['flu', 'measles']:
     basepop.ensure_out_dir(out_dir)
 
     # plot results
-    model.make_graph(os.path.join(out_dir, infection + '_flow_diagram'))
+    model.make_flow_diagram_png(os.path.join(out_dir, infection + '_flow_diagram'))
     plot_epidemiological_indicators(model, infection, ['incidence', 'prevalence', 'infections'], out_dir)
     plot_compartment_sizes(model)
 
@@ -299,7 +299,7 @@ out_dir = 'measles_seir_demography_graphs'
 basepop.ensure_out_dir(out_dir)
 
 # plot results
-model.make_graph(os.path.join(out_dir, 'measles_flow_diagram'))
+model.make_flow_diagram_png(os.path.join(out_dir, 'measles_flow_diagram'))
 plot_epidemiological_indicators(model, 'measles', ['incidence', 'prevalence', 'infections'], out_dir)
 plot_compartment_sizes(model)
 

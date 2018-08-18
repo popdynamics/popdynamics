@@ -35,42 +35,8 @@ sys.path.append(os.path.join(os.path.dirname(__file__), os.pardir))
 import basepop
 
 
-########################################################
-### Static functions for graphing and managing files ###
-########################################################
 
-
-def make_plots(model, out_dir):
-    """
-    Make some basic graphs of the scaling time-variant parameters and the basic model outputs.
-
-    Args:
-        model: Instance of the model object to be interrogated
-        out_dir: The directory to put the graphs in
-    """
-
-    import pylab
-
-    # scaling case detection rate
-    pylab.clf()
-    scaleup_fn = model.scaleup_fns['program_rate_detect']
-    y_vals = list(map(scaleup_fn, model.times))
-    pylab.plot(model.times, y_vals)
-    pylab.title('scaleup test curve')
-    pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
-
-    # main epidemiological outputs
-    pylab.clf()
-    for var_key in ['mortality', 'incidence', 'prevalence']:
-        soln = model.get_var_soln(var_key)
-        pylab.plot(model.times, soln, label=var_key)
-    pylab.legend()
-    pylab.savefig(os.path.join(out_dir, 'fraction.png'))
-
-
-#################################
-### Define model object class ###
-#################################
+# Define the TB Model
 
 class SimpleTbModel(basepop.BaseModel):
     """
@@ -195,56 +161,83 @@ class SimpleTbModel(basepop.BaseModel):
                 self.vars['latent'] += (self.compartments[label] / self.vars['population'] * 1e5)
 
 
-##################
-### Run models ###
-##################
 
-if __name__ == '__main__':
+# Plotting function
+
+def make_plots(model, out_dir):
     """
-    Run and graph a simple TB model with time-variant case detection rate, then run the same model with an intervention
-    (BCG vaccination) applied.
+    Make some basic graphs of the scaling time-variant parameters and the basic model outputs.
 
-    Create a simple TB model without any interventions and a single scaling parameter for case detection rate
-    (as shown in the instantiation of the TB model object).
+    Args:
+        model: Instance of the model object to be interrogated
+        out_dir: The directory to put the graphs in
     """
 
-    time_treatment = .5
-    fixed_parameters = {
-        'demo_rate_birth': old_div(20., 1e3),
-        'demo_rate_death': old_div(1., 65),
-        'tb_n_contact': 40.,
-        'tb_rate_earlyprogress': old_div(.1, .5),
-        'tb_rate_lateprogress': old_div(.1, 100.),
-        'tb_rate_stabilise': old_div(.9, .5),
-        'tb_rate_recover': old_div(.6, 3.),
-        'tb_rate_death': old_div(.4, 3.),
-        'program_rate_completion_infect': old_div(.9, time_treatment),
-        'program_rate_default_infect': old_div(.05, time_treatment),
-        'program_rate_death_infect': old_div(.05, time_treatment),
-        'program_rate_completion_noninfect': old_div(.9, time_treatment),
-        'program_rate_default_noninfect': old_div(.05, time_treatment),
-        'program_rate_death_noninfect': old_div(.05, time_treatment)
-    }
+    import pylab
 
-    model = SimpleTbModel(fixed_parameters)
-    model.make_times(1900, 2050, .05)
-    model.integrate(method='explicit')
+    # flow diagram of model
+    model.make_flow_diagram_png(os.path.join(out_dir, 'workflow'))
 
-    # graph outputs
-    out_dir = 'tb_graphs'
-    basepop.ensure_out_dir(out_dir)
-    model.make_graph(os.path.join(out_dir, 'workflow'))
-    make_plots(model, out_dir)
-    basepop.open_pngs_in_dir(out_dir)
+    # scaling case detection rate
+    pylab.clf()
+    scaleup_fn = model.scaleup_fns['program_rate_detect']
+    y_vals = list(map(scaleup_fn, model.times))
+    pylab.plot(model.times, y_vals)
+    pylab.title('scaleup test curve')
+    pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
 
-    # add vaccination as an intervention to the same model as run and presented immediately above
-    model = SimpleTbModel(fixed_parameters, ['vaccination'])
-    model.make_times(1900, 2050, .05)
-    model.integrate(method='explicit')
+    # main epidemiological outputs
+    pylab.clf()
+    for var_key in ['mortality', 'incidence', 'prevalence']:
+        soln = model.get_var_soln(var_key)
+        pylab.plot(model.times, soln, label=var_key)
+    pylab.legend()
+    pylab.savefig(os.path.join(out_dir, 'fraction.png'))
 
-    # graph outputs
-    out_dir = 'tb_vaccination_graphs'
-    basepop.ensure_out_dir(out_dir)
-    model.make_graph(os.path.join(out_dir, 'workflow'))
-    make_plots(model, out_dir)
-    basepop.open_pngs_in_dir(out_dir)
+
+
+# Run and graph a simple TB model with time-variant case detection rate.
+# Create a simple TB model without any interventions and a single scaling parameter for case detection rate
+# (as shown in the instantiation of the TB model object).
+
+time_treatment = .5
+fixed_parameters = {
+    'demo_rate_birth': old_div(20., 1e3),
+    'demo_rate_death': old_div(1., 65),
+    'tb_n_contact': 40.,
+    'tb_rate_earlyprogress': old_div(.1, .5),
+    'tb_rate_lateprogress': old_div(.1, 100.),
+    'tb_rate_stabilise': old_div(.9, .5),
+    'tb_rate_recover': old_div(.6, 3.),
+    'tb_rate_death': old_div(.4, 3.),
+    'program_rate_completion_infect': old_div(.9, time_treatment),
+    'program_rate_default_infect': old_div(.05, time_treatment),
+    'program_rate_death_infect': old_div(.05, time_treatment),
+    'program_rate_completion_noninfect': old_div(.9, time_treatment),
+    'program_rate_default_noninfect': old_div(.05, time_treatment),
+    'program_rate_death_noninfect': old_div(.05, time_treatment)
+}
+
+model = SimpleTbModel(fixed_parameters)
+model.make_times(1900, 2050, .05)
+model.integrate(method='explicit')
+
+# Graph outputs
+out_dir = 'tb_graphs'
+basepop.ensure_out_dir(out_dir)
+make_plots(model, out_dir)
+basepop.open_pngs_in_dir(out_dir)
+
+
+# Run the same model but with an intervention (BCG vaccination) applied.
+# Add vaccination as an intervention to the same model as run and presented immediately above
+
+model = SimpleTbModel(fixed_parameters, ['vaccination'])
+model.make_times(1900, 2050, .05)
+model.integrate(method='explicit')
+
+# Graph outputs
+out_dir = 'tb_vaccination_graphs'
+basepop.ensure_out_dir(out_dir)
+make_plots(model, out_dir)
+basepop.open_pngs_in_dir(out_dir)

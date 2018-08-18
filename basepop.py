@@ -631,7 +631,8 @@ class BaseModel(object):
     def integrate_continuous_stochastic(self):
         """
         Run a continuous stochastic simulation. This uses the Gillespie algorithm
-        to simulate events
+        to simulate events. Between the set times, dt is estimated by the
+        rates found in self.events
         """
 
         self.init_run()
@@ -656,27 +657,28 @@ class BaseModel(object):
                 self.calculate_events()
 
                 if len(self.events) == 0:
-                    print("No more changes, quit at time", time)
-                    break
+                    # equilibrium reached, no more changes, so go
+                    # to end of interval
+                    dt = new_time - time
+                else:
+                    event_rates = [event[2] for event in self.events]
+                    i_event = pick_event(event_rates)
 
-                event_rates = [event[2] for event in self.events]
-                i_event = pick_event(event_rates)
+                    total_rate = sum(event_rates)
+                    dt = old_div(- math.log(random.random()), total_rate)
 
-                total_rate = sum(event_rates)
-                dt = old_div(- math.log(random.random()), total_rate)
+                    from_label, to_label, rate = self.events[i_event]
+                    if from_label and to_label:
+                        self.compartments[from_label] -= 1
+                        self.compartments[to_label] += 1
+                    elif to_label is None:
+                        # death
+                        self.compartments[from_label] -= 1
+                    elif from_label is None:
+                        # birth
+                        self.compartments[to_label] += 1
 
-                from_label, to_label, rate = self.events[i_event]
-                if from_label and to_label:
-                    self.compartments[from_label] -= 1
-                    self.compartments[to_label] += 1
-                elif to_label is None:
-                    # death
-                    self.compartments[from_label] -= 1
-                elif from_label is None:
-                    # birth
-                    self.compartments[to_label] += 1
-
-                self.checks()
+                    self.checks()
                 time += dt
                 n_sample += 1
 
@@ -684,15 +686,14 @@ class BaseModel(object):
                 y = self.convert_compartments_to_list(self.compartments)
                 self.soln_array[i_time + 1, :] = y
 
-        print("integrate_continuous_stochastic time:%d events:%d" % (time, n_sample))
-
         self.calculate_diagnostics()
 
     def integrate_discrete_time_stochastic(self, dt=1):
         """
-        Run a continuous stochastic simulation. This uses the Tau-leaping
+        Run a discrete-time stochastic simulation. This uses the Tau-leaping
         extension to the Gillespie algorithm, with a Poisson estimator
-        to estimate multiple events in a time-interval.
+        to estimate multiple events in a time-interval. dt is set
+        for each interval
         """
 
         self.init_run()
@@ -878,7 +879,7 @@ class BaseModel(object):
         #     - self.vars['rate_infection_death']
         # assert abs(sum(self.flows.values()) - population_change) < error_margin
 
-    def make_graph(self, png):
+    def make_flow_diagram_png(self, png):
         """
         Use external module (graphviz) to create a flow diagram of the compartmental structure of the model
 
