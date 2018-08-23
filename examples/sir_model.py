@@ -185,9 +185,6 @@ def plot_overlays(times, solutions, ylabel, title, png):
 
 
 def plot_epidemiological_indicators(models, png):
-    """
-    :param indicators: list of epidemiological indicators within the model"s var attribute
-    """
     indicators = ["incidence", "prevalence"]
     solutions = []
     for model in models:

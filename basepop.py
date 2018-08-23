@@ -21,7 +21,7 @@ import numpy
 
 try:
     from scipy.integrate import odeint
-except:
+except Exception:
     print("Unable to load scipy")
 
 
@@ -51,8 +51,8 @@ def open_pngs_in_dir(out_dir):
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """
-    Adds or modifies a list of tuples, compares only the items before the last in the tuples,
-    the last value in the tuple is assumed to be a value.
+    Adds or modifies a list of tuples, compares only the items before the last
+    in the tuples, the last value in the tuple is assumed to be a value.
     """
     for i, test_tuple in enumerate(a_list):
         if test_tuple[:-1] == a_tuple[:-1]:
@@ -64,9 +64,10 @@ def add_unique_tuple_to_list(a_list, a_tuple):
 
 def label_intersects_tags(label, tags):
     """
-    Determine whether a string is contained within a list of strings for use in functions such as calculation of the
-    force of infection, where we might want a list of all the compartments that contain a particular string
-    (such as 'active' or 'infectious').
+    Determine whether a string is contained within a list of strings for use
+    in functions such as calculation of the force of infection, where we might
+    want a list of all the compartments that contain a particular string (such
+    as 'active' or 'infectious').
 
     Args:
         label: The string we're searching for
@@ -77,11 +78,15 @@ def label_intersects_tags(label, tags):
             return True
     return False
 
+
 # Math functions to build scale-up functions
 
-def make_sigmoidal_curve(y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
+def make_sigmoidal_curve(
+        y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
     """
-    Function to make a sigmoidal curve for smooth scaling of time-variant parameter values
+
+    Function to make a sigmoidal curve for smooth scaling of time-variant
+    parameter values
 
     Args:
         y_low: lowest y value
@@ -124,13 +129,17 @@ def make_constant_function(value):
 
 def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
     curve1 = make_sigmoidal_curve(
-        y_high=y_med, y_low=y_low,
-        x_start=x_start, x_inflect=(x_med-x_start)*0.5 + x_start,
+        y_high=y_med,
+        y_low=y_low,
+        x_start=x_start,
+        x_inflect=(x_med - x_start) * 0.5 + x_start,
         multiplier=4)
 
     curve2 = make_sigmoidal_curve(
-        y_high=y_high, y_low=y_med,
-        x_start=x_med, x_inflect=(x_end-x_med)*0.5 + x_med,
+        y_high=y_high,
+        y_low=y_med,
+        x_start=x_med,
+        x_inflect=(x_end - x_med) * 0.5 + x_med,
         multiplier=4)
 
     def curve(x):
@@ -146,6 +155,11 @@ def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
 
 
 def pick_event(event_intervals):
+    """
+    Returns a randomly selected index of an event from a list of intervals
+
+    :param event_intervals: list of floats, intervals proportional to each event       of each event are proportional to the intervals
+    """
     i_event = 0
     cumul_intervals = []
     cumul_interval = 0.0
@@ -159,6 +173,8 @@ def pick_event(event_intervals):
     return i_event
 
 
+# The Base model
+
 class BaseModel(object):
     """
     Basic concepts
@@ -166,7 +182,7 @@ class BaseModel(object):
       params - values that remain fixed throughout the model run
     """
 
-    def __init__(self):
+    def __init__(self, params=None):
 
         # list of labels for all compartments
         self.labels = []
@@ -174,22 +190,29 @@ class BaseModel(object):
         # stores the initial value for all compartments
         self.init_compartments = {}
 
-        # stores the values of all parameters
-        # there should be no hard-coded values except as contained in this structure
+        # stores the values of all parameters there should be no hard-coded
+        # values except as contained in this structure
         self.params = {}
+        if params:
+            for key in params:
+                self.params[key] = params[key]
 
         # stored list of time points
-        self.times = None
+        self.times = []
         self.time = 0
+        self.start_time = 0
 
         # scale-up functions, generally used for time-variant parameters,
-        # whose values change in a way that is predictable before the model has been run
+        # whose values change in a way that is predictable before the model
+        # has been run
         self.scaleup_fns = {}
 
-        # stores the population compartments in the model at a given time-point
+        # stores the population compartments in the model at a given time-
+        # point
         self.compartments = {}
 
-        # stores any auxillary variables used to calculate dynamic effects (such as transmission) at each time-step
+        # stores any auxillary variables used to calculate dynamic effects
+        # (such as transmission) at each time-step
         self.vars = {}
 
         # total flow of each compartment
@@ -201,25 +224,29 @@ class BaseModel(object):
         #   - var_label: name of var that holds the entry rate
         self.var_entry_rate_flow = []
 
-        # fixed transfer rates (often for progression between infected states after infection has occurred)
-        # list of 3-tuple (from_label, to_label, param_label)
+        # fixed transfer rates (often for progression between infected states
+        # after infection has occurred) list of 3-tuple (from_label, to_label,
+        # param_label)
         #   - from_label: name of compartment that loses population
         #   - to_label: name of compartment that gains population
         #   - param_label: name of param that holds the rate
         self.fixed_transfer_rate_flows = []
 
-        # variable transfer rates (can be used either for flows that vary due to predictable effects
-        # - scale-up functions - or for flows that vary due to the dynamics of the infection - force of infection)
-        # list of 3-tuple (from_label, to_label, var_label)
+        # variable transfer rates (can be used either for flows that vary due
+        # to predictable effects - scale-up functions - or for flows that vary
+        # due to the dynamics of the infection - force of infection) list of
+        # 3-tuple (from_label, to_label, var_label)
         #   - from_label: name of compartment that loses population
         #   - to_label: name of compartment that gains population
         #   - var_label: name of var that holds the rate
         self.var_transfer_rate_flows = []
 
-        # fixed infection death rate flows (Should only be applied to persons with active disease as a consequence of
-        # the infection, while latent or preinfectious individuals should be assumed to take the population-wide
-        # death rates only. Also note that for actively diseased persons, this rate is added to the population rate.)
-        # list of 2-tuple (label, rate)
+        # fixed infection death rate flows (Should only be applied to persons
+        # with active disease as a consequence of the infection, while latent
+        # or preinfectious individuals should be assumed to take the
+        # population-wide death rates only. Also note that for actively
+        # diseased persons, this rate is added to the population rate.) list
+        # of 2-tuple (label, rate):
         #   - label: name of compartment
         #   - rate: disease specific death rate
         self.infection_death_rate_flows = []
@@ -235,14 +262,20 @@ class BaseModel(object):
 
     def make_times(self, start, end, delta):
         """
-        Make a list of times for integration to be performed at. Units are arbitrary.
+
+        Make a list of times for integration to be performed at. Units are
+        arbitrary.
 
         Args:
-            start: Numerical time to start at (can be a calendar year, or zero for epidemic time, or other)
+            start: Numerical time to start at (can be a calendar year, or zero
+                for epidemic time, or other)
             end: Numerical end time
             delta: Interval between times
         Creates:
-            self.times: List of numerical times for integration to be assessed at
+
+            self.times: List of numerical times for integration to be assessed
+            at
+
         """
 
         assert type(start) is float or type(start) is int, 'Start time not specified with float'

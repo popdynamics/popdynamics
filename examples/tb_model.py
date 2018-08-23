@@ -196,10 +196,6 @@ def make_plots(model, out_dir):
 
 
 
-# Run and graph a simple TB model with time-variant case detection rate.
-# Create a simple TB model without any interventions and a single scaling parameter for case detection rate
-# (as shown in the instantiation of the TB model object).
-
 time_treatment = .5
 fixed_parameters = {
     'demo_rate_birth': old_div(20., 1e3),
@@ -218,6 +214,10 @@ fixed_parameters = {
     'program_rate_death_noninfect': old_div(.05, time_treatment)
 }
 
+
+# Run and graph a simple TB model with time-variant case detection rate.
+# Create a simple TB model without any interventions and a single scaling parameter for case detection rate
+# (as shown in the instantiation of the TB model object).
 model = SimpleTbModel(fixed_parameters)
 model.make_times(1900, 2050, .05)
 model.integrate(method='explicit')
@@ -229,9 +229,9 @@ make_plots(model, out_dir)
 basepop.open_pngs_in_dir(out_dir)
 
 
+
 # Run the same model but with an intervention (BCG vaccination) applied.
 # Add vaccination as an intervention to the same model as run and presented immediately above
-
 model = SimpleTbModel(fixed_parameters, ['vaccination'])
 model.make_times(1900, 2050, .05)
 model.integrate(method='explicit')

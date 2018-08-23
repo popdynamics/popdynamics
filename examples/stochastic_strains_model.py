@@ -167,7 +167,7 @@ class StrainsModel(basepop.BaseModel):
                 self.vars["prevalence"] += old_div(val, self.vars["population"])
 
 
-def plot_population_overlays(models, png):
+def plot_populations(models, png):
     colors = []
     for name in "bgrykcm":
         rgb = matplotlib.colors.colorConverter.to_rgb(name)
@@ -193,7 +193,7 @@ def plot_population_overlays(models, png):
     pylab.savefig(png)
 
 
-def plot_extinction_graph(models, png):
+def plot_extinction(models, png):
     extinctions = []
     for model in models:
         invader_soln = model.get_compartment_soln("infectious_invader")
@@ -237,11 +237,7 @@ for i_sim in range(n_replica):
 
 out_dir = "strains_sir_graphs"
 basepop.ensure_out_dir(out_dir)
-
-plot_extinction_graph(models, os.path.join(out_dir, "extinction.png"))
-
-plot_population_overlays(models, os.path.join(out_dir, "compartment_sizes.png"))
-
+plot_extinction(models, os.path.join(out_dir, "extinction.png"))
+plot_populations(models, os.path.join(out_dir, "compartment_sizes.png"))
 models[0].make_flow_diagram_png(os.path.join(out_dir, "flow_diagram"))
-
 basepop.open_pngs_in_dir(out_dir)
