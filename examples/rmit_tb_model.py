@@ -23,16 +23,16 @@ class RmitTbModel(basepop.BaseModel):
     def __init__(self, parameters):
         basepop.BaseModel.__init__(self)
 
+        # parameter setting
+        for parameter, value in parameters.items():
+            self.set_param(parameter, value)
+
         # define all compartments, initialise as empty and then populate
         model_compartments = ['S', 'L1', 'L2', 'P', 'I', 'R']
         for each_compartment in model_compartments:
             self.set_compartment(each_compartment, 0.)
         self.set_compartment('S', 1.)
         self.set_compartment('I', 1e-3)
-
-        # parameter setting
-        for parameter, value in list(parameters.items()):
-            self.set_param(parameter, value)
 
         # parameter processing
         self.set_param('f_phi', self.params['f'] * self.params['phi'])
@@ -50,8 +50,8 @@ class RmitTbModel(basepop.BaseModel):
 
         # infection
         self.vars['beta_I'] = self.params['beta'] * self.compartments['I'] / self.vars['population']
-        for i in range(1, 4):
-            self.vars['sigma' + str(i) + '_beta_I'] = self.vars['beta_I'] * self.params['sigma' + str(i)]
+        for i_sigma in range(1, 4):
+            self.vars['sigma' + str(i_sigma) + '_beta_I'] = self.vars['beta_I'] * self.params['sigma' + str(i_sigma)]
 
     def set_flows(self):
         """
@@ -117,8 +117,8 @@ fixed_parameters = {
 }
 sigmas = [0., 0., 0.]
 sigmas_dict = {}
-for sigma in range(len(sigmas)):
-    sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
+for i_sigma in range(len(sigmas)):
+    sigmas_dict['sigma' + str(i_sigma + 1)] = sigmas[i_sigma]
 fixed_parameters.update(sigmas_dict)
 
 
@@ -138,8 +138,8 @@ for beta in betas:
 pylab.clf()
 pylab.semilogy(betas, proportions)
 text = r''
-for sigma in range(len(sigmas)):
-    text += r'$\sigma_' + str(sigma + 1) + '$=%.0f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+for i_sigma in range(len(sigmas)):
+    text += r'$\sigma_' + str(i_sigma + 1) + '$=%.0f\n' % sigmas_dict['sigma' + str(i_sigma + 1)]
 pylab.text(400., 1e-2, text)
 pylab.ylabel('proportion of infectives, I')
 pylab.xlabel(r'transmission coefficient, $\beta$')
@@ -150,13 +150,16 @@ pylab.savefig(os.path.join(out_dir, 'figure_2.png'))
 
 # figure 8
 
-sets_of_sigmas = {'a': [0.25, 0.125, 0.125], 'b': [0.25, 0.5, 0.5]}
+sets_of_sigmas = {
+    'a': [0.25, 0.125, 0.125],
+    'b': [0.25, 0.5, 0.5]
+}
 for fig_letter in sets_of_sigmas:
     pylab.clf()
     sigmas = sets_of_sigmas[fig_letter]
     sigmas_dict = {}
-    for sigma in range(len(sigmas)):
-        sigmas_dict['sigma' + str(sigma + 1)] = sigmas[sigma]
+    for i_sigma in range(len(sigmas)):
+        sigmas_dict['sigma' + str(i_sigma + 1)] = sigmas[i_sigma]
     fixed_parameters.update(sigmas_dict)
     fixed_parameters['tau'] = 2.
     for rho in [0., 0.5, 1., 10.]:
@@ -171,8 +174,8 @@ for fig_letter in sets_of_sigmas:
             proportions.append(model.vars['proportion'])
         pylab.semilogy(betas, proportions, label=r'$\rho$=' + '{0:.1g}'.format(rho))
     text = r''
-    for sigma in range(len(sigmas)):
-        text += r'$\sigma_' + str(sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(sigma + 1)]
+    for i_sigma in range(len(sigmas)):
+        text += r'$\sigma_' + str(i_sigma + 1) + '$=%.2f\n' % sigmas_dict['sigma' + str(i_sigma + 1)]
     pylab.text(400., 1e-4, text)
     pylab.ylabel('proportion of infectives, I')
     pylab.xlabel(r'transmission coefficient, $\beta$')

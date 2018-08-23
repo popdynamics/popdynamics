@@ -16,6 +16,7 @@ import math
 import random
 import platform
 import glob
+import copy
 
 import numpy
 
@@ -84,19 +85,15 @@ def label_intersects_tags(label, tags):
 def make_sigmoidal_curve(
         y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
     """
-
-    Function to make a sigmoidal curve for smooth scaling of time-variant
+    Returns a sigmoidal curve function for smooth scaling of time-variant
     parameter values
 
-    Args:
-        y_low: lowest y value
-        y_high: highest y value
-        x_inflect: inflection point of graph along the x-axis
-        multiplier: if 1, slope at x_inflect goes to (0, y_low), larger
+    :param y_low: lowest y value
+    :param y_high: highest y value
+    :param x_inflect: inflection point of graph along the x-axis
+    :param multiplier: if 1, slope at x_inflect goes to (0, y_low), larger
                     values makes it steeper
-
-    Returns:
-        function that increases sigmoidally from 0 y_low to y_high
+    :return: function that increases sigmoidally from 0 y_low to y_high
         the halfway point is at x_inflect on the x-axis and the slope
         at x_inflect goes to (0, y_low) if the multiplier is 1.
     """
@@ -177,13 +174,56 @@ def pick_event(event_intervals):
 
 class BaseModel(object):
     """
+    BaseModel is a compartmental model that
+    implements a system of differential equations
+    that connects the populations of the different
+    compartments.
+
+    Most connections between compartments are
+    of the double-entry book-keeping type where
+    losses in one compartments are taken up
+    from another compartment.
+
+    In order to handle all the connections without
+    putting too much of a burden on the programmer
+    the differential equations are built up from
+    the individual connections rather than being
+    specified straight up.
+
+    That is dCompartment/dTime = linear function(compartment)
+
+    0) initializes compartments to initial variables
+
+    The execution loop is:
+
+    1) externally add to this.delta of compartments
+       due to extrinsic import of people, via this.transferTo
+    2) recalculate this.var - should
+       depends only on this.param and
+       current this.compartment values
+    3) Generate all events - single changes to
+       to compartments, or paired changes to two
+       compartments. The amount of changes in each
+       event should be proportional to:
+         - compartments
+         - params
+         - var
+    4) Events are added to this.delta
+    5) Deltas are multiplied by a time factor
+    6) Compartments updated
+    7) Chosen this.compartments and this.var at
+       the given time-point
+       to be saved in this.solutions
+
     Basic concepts
-      vars - values that are calculated at every time step
-      params - values that remain fixed throughout the model run
+      self.vars - values that are calculated at every time step
+      self.params - values that remain fixed throughout the model run
     """
 
-    def __init__(self, params=None):
-
+    def __init__(self):
+        """
+        :param params: dictionary of params to add to self.params
+        """
         # list of labels for all compartments
         self.labels = []
 
@@ -193,9 +233,6 @@ class BaseModel(object):
         # stores the values of all parameters there should be no hard-coded
         # values except as contained in this structure
         self.params = {}
-        if params:
-            for key in params:
-                self.params[key] = params[key]
 
         # stored list of time points
         self.times = []
@@ -255,29 +292,57 @@ class BaseModel(object):
         self.background_death_rate = 0.
 
         # other universally required model attributes
+
+        # array to store self.compartment values over self.times
         self.soln_array = None
+
+        # array to self.vars keys
         self.var_labels = None
+
+        # array to store self.vars values over self.times
+        self.var_array = None
+
+        # array to store compartment self.flows of compartment values over self.times
+        self.flow_array = None
+
+    def clear_solns(self):
+        self.var_labels = None
+        self.soln_array = None
         self.var_array = None
         self.flow_array = None
 
+    def clone(self):
+        model_copy = type(self)()
+
+        model_copy.params = copy.deepcopy(self.params)
+        model_copy.compartments = copy.deepcopy(self.compartments)
+
+        model_copy.scaleup_fns = copy.deepcopy(self.scaleup_fns)
+
+        model_copy.var_entry_rate_flow = copy.deepcopy(self.var_entry_rate_flow)
+        model_copy.fixed_transfer_rate_flows = copy.deepcopy(self.fixed_transfer_rate_flows)
+        model_copy.var_transfer_rate_flows = copy.deepcopy(self.var_transfer_rate_flows)
+        model_copy.infection_death_rate_flows = copy.deepcopy(self.infection_death_rate_flows)
+        model_copy.background_death_rate = copy.deepcopy(self.background_death_rate)
+
+        model_copy.var_labels = copy.deepcopy(self.var_labels)
+
+        model_copy.soln_array = numpy.copy(self.soln_array)
+        model_copy.var_array = numpy.copy(self.var_array)
+        model_copy.flow_array = numpy.copy(self.flow_array)
+
+        return model_copy
+
     def make_times(self, start, end, delta):
         """
+        Make self.times, a list of times for integration to be performed at.
+        Units are arbitrary.
 
-        Make a list of times for integration to be performed at. Units are
-        arbitrary.
-
-        Args:
-            start: Numerical time to start at (can be a calendar year, or zero
+        :param start: Numerical time to start at (can be a calendar year, or zero
                 for epidemic time, or other)
-            end: Numerical end time
-            delta: Interval between times
-        Creates:
-
-            self.times: List of numerical times for integration to be assessed
-            at
-
+        :param end: Numerical end time
+        :param delta: Interval between times
         """
-
         assert type(start) is float or type(start) is int, 'Start time not specified with float'
         assert type(end) is float or type(end) is int, 'End time not specified with a number'
         assert type(delta) is float or type(delta) is int, 'Time increment not specified with a number'
@@ -293,12 +358,10 @@ class BaseModel(object):
         Alternative to make_times. For this one, the third argument is the number of time points required, rather than
         the step between time points.
 
-        Args:
-            start: As for make_times
-            end: As for make_times
-            n: Number of time points that are needed
+        :param start: As for make_times
+        :param end: As for make_times
+        :param n: Number of time points that are needed
         """
-
         self.times = []
         step = start
         delta = old_div((end - start), float(n))
@@ -310,11 +373,9 @@ class BaseModel(object):
         """
         Create a population compartment for the model.
 
-        Args:
-            label: String to describe the compartment
-            init_val: Starting value for that compartment (default behaviour is to start from empty compartment)
+        :param label: String to describe the compartment
+        :param init_val: Starting value for that compartment (default behaviour is to start from empty compartment)
         """
-
         assert type(label) is str, 'Compartment label for initial setting not string'
         assert type(init_val) is float or type(init_val) is int, 'Value to start % compartment from not string' % label
         assert init_val >= 0., 'Start with negative compartment not permitted'
@@ -326,11 +387,9 @@ class BaseModel(object):
         """
         Add a parameter value to the dictionary of parameter values
 
-        Args:
-            label: String name of the compartment
-            val: Value (generally float) for the parameter
+        :param label: String name of the compartment
+        :param val: Value (generally float) for the parameter
         """
-
         assert type(label) is str, 'Parameter name "%s" is not string' % label
         assert type(val) is float or type(val) is int, 'Fixed parameter value is not numeric for %' % label
         self.params[label] = val
@@ -339,22 +398,17 @@ class BaseModel(object):
         """
         Distribute the list of compartment values to create a dictionary (reverse of convert_compartments_to_list).
 
-        Args:
-            vec: List of compartment values ordered according to the labels list
-        Returns:
-            Dictionary with keys from labels attribute and values from vec
+        :param vec: List of compartment values ordered according to the labels list
+        :return: Dictionary with keys from labels attribute and values from vec
         """
-
         return {l: vec[i] for i, l in enumerate(self.labels)}
 
     def convert_compartments_to_list(self, compartments):
         """
         Distribute compartments dictionary to a list for making derivative function.
 
-        Args:
-            compartments: Dictionary of compartments
-        Returns:
-            List of compartment values with equivalent ordering to labels
+        :param compartments: Dictionary of compartments
+        :return: List of compartment values with equivalent ordering to labels
         """
 
         return [compartments[l] for l in self.labels]
@@ -535,17 +589,23 @@ class BaseModel(object):
 
         return derivative_fn
 
+    def set_flows(selfs):
+        """
+        To be overriden. Here, the flows in:
+          - self.var_entry_rate_flow
+          - self.var_transfer_rate_flows
+          - self.fixed_transfer_rate_flows
+        are set
+        """
+        pass
+
     def init_run(self):
         """
         Starting method to integration processes
         """
+        self.clear_solns()
 
         self.set_flows()
-        self.var_labels = None
-        self.soln_array = None
-        self.var_array = None
-        self.flow_array = None
-
         # check that each compartment has at least one entry flow or exit flow
         # (i.e. that all compartments are connected to the model)
         labels_with_entry = [v[0] for v in self.var_entry_rate_flow]
@@ -567,8 +627,7 @@ class BaseModel(object):
         Master integration function to prepare for integration run and then call the process to actually run the
         integration process according to the process selected in the arguments to this method.
 
-        Args:
-            method: Either 'explicit' or 'scipy' to select the integration process required
+        :param method: Either 'explicit' or 'scipy' to select the integration process required
         """
 
         self.init_run()
@@ -868,10 +927,8 @@ class BaseModel(object):
         """
         Find the values of a compartment's flows over the time steps of the integration
 
-        Args:
-            label: String for the name of the compartment of interest
-        Returns:
-            List of values for this compartment's flows over time
+        :param label: String for the name of the compartment of interest
+        :return: List of values for this compartment's flows over time
         """
 
         assert self.flow_array is not None, 'calculate_diagnostics has not been run'
@@ -883,8 +940,7 @@ class BaseModel(object):
         Reload the compartmental state of a model from a previous time point
         (for running alternative scenarios if epidemiological changes have been made from a point in time)
 
-        Args:
-            i_time: The index of the list of times to load from
+        :param i_time: The index of the list of times to load from
         """
 
         self.time = self.times[i_time]
@@ -897,27 +953,18 @@ class BaseModel(object):
         """
         Assertions run during the simulation, should be over-ridden for each model, but given as an example
 
-        Args:
-            error_margin: acceptable difference between target invariants
+        :param error_margin: acceptable difference between target invariants
         """
 
         # Check all compartments are positive
         for label in self.labels:
             assert self.compartments[label] >= 0.
 
-        # Check population is conserved across compartments
-        # population_change = \
-        #     self.vars['rate_birth'] \
-        #     - self.vars['rate_death'] \
-        #     - self.vars['rate_infection_death']
-        # assert abs(sum(self.flows.values()) - population_change) < error_margin
-
     def make_flow_diagram_png(self, png):
         """
         Use external module (graphviz) to create a flow diagram of the compartmental structure of the model
 
-        Args:
-            png: String for the filename of the file for the diagram to be stored in
+        :param png: String for the filename of the file for the diagram to be stored in
         """
 
         try:

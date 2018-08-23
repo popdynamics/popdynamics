@@ -37,6 +37,10 @@ from __future__ import division
 from builtins import zip
 from past.utils import old_div
 
+import copy
+
+import numpy
+
 # # hack to allow basepop to be loaded from the parent directory
 import os
 import sys
@@ -73,7 +77,7 @@ class SirModel(basepop.BaseModel):
         basepop.BaseModel.__init__(self)
 
         default_params = {
-            "population": 200,
+            "population": 1000,
             "start_infectious": 1.,
             "r0": 12.,
             "duration_preinfectious": 8.,
@@ -199,83 +203,42 @@ def plot_overlays(times, solutions, ylabel, title, png):
     pylab.savefig(png)
 
 
-def plot_epidemiological_indicators(models, png):
-    indicators = ["incidence", "prevalence"]
-    solutions = []
-    for model in models:
-        solution = {}
-        for indicator in indicators:
-            solution[indicator] = model.get_var_soln(indicator)
-        solutions.append(solution)
-        times = model.times
-    plot_overlays(
-        times, solutions, "per day (except prevalence), per person",
-        "Indicators", png)
-
-
-def plot_rn(models, png):
-    solutions = []
-    for model in models:
-        r0 = model.params["r0"]
-        times = model.times
-        susceptibles = model.get_compartment_soln("susceptible")
-        populations = model.get_var_soln("population")
-        proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
-        solution = {"Rn": [p * r0 for p in proportions]}
-        solutions.append(solution)
-    plot_overlays(times, solutions, "", "Rn", png)
-
-
-def plot_populations(models, png):
-    solutions = []
-    for model in models:
-        solution = {}
-        for key in model.compartments.keys():
-            solution[key] = model.get_compartment_soln(key)
-        solutions.append(solution)
-    plot_overlays(models[0].times, solutions, "persons", "Populations", png)
-
-
-def generate_output(models, out_dir, modifier):
-    models[0].make_flow_diagram_png(
-        os.path.join(out_dir, "flow_diagram"))
-    plot_epidemiological_indicators(
-        models, os.path.join(out_dir, modifier + "_indicators.png"))
-    plot_populations(
-        models, os.path.join(out_dir, modifier + "_compartment_sizes.png"))
-    plot_rn(
-        models, os.path.join(out_dir, modifier + "_rn.png"))
-
-
 # The main routine
 
-out_dir = "sir_graphs"
+out_dir = "mix_sir_graphs"
 basepop.ensure_out_dir(out_dir)
 
-model = SirModel()
-model.make_times(0, 50, 1)
-model.integrate()
-generate_output([model], out_dir, 'explicit')
+model1 = SirModel({'population': 20})
+model1.make_times(0, 10, 1)
+model1.integrate_continuous_stochastic()
 
-# stochastic continuous-time models
-n_replica = 20
-models = []
-for i in range(n_replica):
-    new_model = SirModel()
-    new_model.make_times(0, 50, 1)
-    new_model.integrate_continuous_stochastic()
-    models.append(new_model)
-generate_output(models, out_dir, "discrete")
+model2 = model1.clone()
+model2.init_compartments = copy.deepcopy(model2.compartments)
+model2.make_times(10, 50, 1)
+model2.integrate()
 
-# stochastic discrete-time models
-n_replica = 20
-models = []
-for i in range(n_replica):
-    new_model = SirModel()
-    new_model.make_times(0, 50, 1)
-    new_model.integrate_continuous_stochastic()
-    models.append(new_model)
-generate_output(models, out_dir, "continuous")
+solution = {}
+times = None
+for model in [model1, model2]:
+    for key in model.compartments.keys():
+        new_solution = numpy.copy(model.get_compartment_soln(key))
+        if key not in solution:
+            solution[key] = new_solution
+        else:
+            solution[key] = numpy.concatenate(
+                (solution[key], new_solution[1:]), axis=0)
+    if times is None:
+        times = copy.deepcopy(model.times)
+    else:
+        times.extend(model.times[1:])
+
+print(times)
+plot_overlays(
+    times,
+    [solution],
+    "Persons",
+    "Compartments",
+    os.path.join(out_dir, 'compartments'))
 
 basepop.open_pngs_in_dir(out_dir)
 

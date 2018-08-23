@@ -41,24 +41,44 @@ import basepop
 class SimpleTbModel(basepop.BaseModel):
     """
     Initial TB model by James Trauer.
-    Nested inheritance from basepop.BaseModel, which applies to any infectious disease generally.
+    Nested inheritance from BaseModel, which applies to any infectious disease generally.
     """
 
-    def __init__(self, fixed_parameters, interventions=[]):
+    def __init__(self, interventions=[]):
         """
         Inputs:
             interventions: List of interventions to be simulated in the run of the model
         """
-
         basepop.BaseModel.__init__(self)
+
+        time_treatment = .5
+        params = {
+            'demo_rate_birth': old_div(20., 1e3),
+            'demo_rate_death': old_div(1., 65),
+            'tb_n_contact': 40.,
+            'tb_rate_earlyprogress': old_div(.1, .5),
+            'tb_rate_lateprogress': old_div(.1, 100.),
+            'tb_rate_stabilise': old_div(.9, .5),
+            'tb_rate_recover': old_div(.6, 3.),
+            'tb_rate_death': old_div(.4, 3.),
+            'program_rate_completion_infect': old_div(.9, time_treatment),
+            'program_rate_default_infect': old_div(.05, time_treatment),
+            'program_rate_death_infect': old_div(.05, time_treatment),
+            'program_rate_completion_noninfect': old_div(.9, time_treatment),
+            'program_rate_default_noninfect': old_div(.05, time_treatment),
+            'program_rate_death_noninfect': old_div(.05, time_treatment)
+        }
+        for key in params:
+            self.params[key] = params[key]
 
         # make interventions list an attribute of the object
         self.interventions = interventions
 
         # define all compartments, initialise as empty and then populate
-        model_compartments \
-            = ['susceptible', 'latent_early', 'latent_late', 'active', 'treatment_infect', 'treatment_noninfect']
-        for each_compartment in model_compartments:
+        labels = [
+            'susceptible', 'latent_early', 'latent_late',
+            'active', 'treatment_infect', 'treatment_noninfect']
+        for each_compartment in labels:
             self.set_compartment(each_compartment, 0.)
         self.set_compartment('susceptible', 1e6)
         self.set_compartment('active', 1.)
@@ -66,10 +86,6 @@ class SimpleTbModel(basepop.BaseModel):
         # additional compartments needed for interventions
         if 'vaccination' in self.interventions:
             self.set_compartment('susceptible_vaccinated', 0.)
-
-        # parameter setting
-        for parameter, value in list(fixed_parameters.items()):
-            self.set_param(parameter, value)
 
         # example of a scaling parameter (case detection rate)
         curve1 = basepop.make_sigmoidal_curve(y_high=2, y_low=0, x_start=1950, x_inflect=1970, multiplier=4)
@@ -168,9 +184,8 @@ def make_plots(model, out_dir):
     """
     Make some basic graphs of the scaling time-variant parameters and the basic model outputs.
 
-    Args:
-        model: Instance of the model object to be interrogated
-        out_dir: The directory to put the graphs in
+    :param model: Instance of the model object to be interrogated
+    :param out_dir: The directory to put the graphs in
     """
 
     import pylab
@@ -183,7 +198,7 @@ def make_plots(model, out_dir):
     scaleup_fn = model.scaleup_fns['program_rate_detect']
     y_vals = list(map(scaleup_fn, model.times))
     pylab.plot(model.times, y_vals)
-    pylab.title('scaleup test curve')
+    pylab.title('scaleup program_rate_detect curve')
     pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
 
     # main epidemiological outputs
@@ -196,29 +211,10 @@ def make_plots(model, out_dir):
 
 
 
-time_treatment = .5
-fixed_parameters = {
-    'demo_rate_birth': old_div(20., 1e3),
-    'demo_rate_death': old_div(1., 65),
-    'tb_n_contact': 40.,
-    'tb_rate_earlyprogress': old_div(.1, .5),
-    'tb_rate_lateprogress': old_div(.1, 100.),
-    'tb_rate_stabilise': old_div(.9, .5),
-    'tb_rate_recover': old_div(.6, 3.),
-    'tb_rate_death': old_div(.4, 3.),
-    'program_rate_completion_infect': old_div(.9, time_treatment),
-    'program_rate_default_infect': old_div(.05, time_treatment),
-    'program_rate_death_infect': old_div(.05, time_treatment),
-    'program_rate_completion_noninfect': old_div(.9, time_treatment),
-    'program_rate_default_noninfect': old_div(.05, time_treatment),
-    'program_rate_death_noninfect': old_div(.05, time_treatment)
-}
-
-
 # Run and graph a simple TB model with time-variant case detection rate.
 # Create a simple TB model without any interventions and a single scaling parameter for case detection rate
 # (as shown in the instantiation of the TB model object).
-model = SimpleTbModel(fixed_parameters)
+model = SimpleTbModel()
 model.make_times(1900, 2050, .05)
 model.integrate(method='explicit')
 
@@ -229,10 +225,9 @@ make_plots(model, out_dir)
 basepop.open_pngs_in_dir(out_dir)
 
 
-
 # Run the same model but with an intervention (BCG vaccination) applied.
 # Add vaccination as an intervention to the same model as run and presented immediately above
-model = SimpleTbModel(fixed_parameters, ['vaccination'])
+model = SimpleTbModel(['vaccination'])
 model.make_times(1900, 2050, .05)
 model.integrate(method='explicit')
 

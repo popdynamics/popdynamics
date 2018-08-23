@@ -56,7 +56,7 @@ class SeirModel(basepop.BaseModel):
     calculate_diagnostic_vars
     """
 
-    def __init__(self, param_dictionary):
+    def __init__(self, params):
         """
         Takes a single dictionary of the parameter values to run the SEIR
         model in order that the rest of the SEIR model code can remain the
@@ -72,27 +72,30 @@ class SeirModel(basepop.BaseModel):
         """
         basepop.BaseModel.__init__(self)
 
+        for key in params:
+            self.params[key] = params[key]
+
         # set starting compartment values
         self.set_compartment(
             'susceptible',
-             param_dictionary['population'] - param_dictionary['start_infectious'])
+            self.params['population'] - self.params['start_infectious'])
         self.set_compartment('preinfectious', 0.0)
-        self.set_compartment('infectious', param_dictionary['start_infectious'])
+        self.set_compartment('infectious', self.params['start_infectious'])
         self.set_compartment('immune', 0.0)
 
         # set model parameters
         self.set_param(
             'infection_beta',
-            1.0 * 
-                param_dictionary['r0'] / 
-                (param_dictionary['duration_infectious'] * 
-                    param_dictionary['population']))
+            1.0 *
+            self.params['r0'] /
+            (self.params['duration_infectious'] *
+             self.params['population']))
         self.set_param(
-            'infection_rate_progress', 
-            1.0 / param_dictionary['duration_preinfectious'])
+            'infection_rate_progress',
+            1.0 / self.params['duration_preinfectious'])
         self.set_param(
-            'infection_rate_recover', 
-            1.0 / param_dictionary['duration_infectious'])
+            'infection_rate_recover',
+            1.0 / self.params['duration_infectious'])
 
     def set_flows(self):
         # set variable infection transition flow
@@ -355,7 +358,7 @@ out_dir = "seir_graphs"
 basepop.ensure_out_dir(out_dir)
 
 for infection in infection_params.keys():
-    print("Running SEIR Model for", 200, "days...")
+    print("Running", infection, "SEIR Model for", 200, "days...")
 
     model = SeirModel(infection_params[infection])
     model.make_times(0, 200, 1)

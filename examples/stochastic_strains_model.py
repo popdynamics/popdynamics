@@ -46,11 +46,8 @@ class StrainsModel(basepop.BaseModel):
     }
     """
 
-    def __init__(self, input_params=None):
+    def __init__(self, input_params=[]):
         basepop.BaseModel.__init__(self)
-
-        if input_params is None:
-            input_params = {}
 
         default_params = {
             "r0_resident": 2,
@@ -60,13 +57,10 @@ class StrainsModel(basepop.BaseModel):
             "rate_recover": 1.0e-2,  # a
             "rate_infection_death": 0,  # phi
         }
-
-        for key, value in list(default_params.items()):
-            if key not in input_params:
-                input_params[key] = value
-
-        for key, value in list(input_params.items()):
-            self.set_param(key, value)
+        for key, value in default_params.items():
+            self.params[key] = value
+        for key, value in input_params:
+            self.params[key] = value
 
         self.set_param(
             "s0",
