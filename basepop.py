@@ -155,7 +155,7 @@ def pick_event(event_intervals):
     """
     Returns a randomly selected index of an event from a list of intervals
 
-    :param event_intervals: list of floats, intervals proportional to each event       of each event are proportional to the intervals
+    :param event_intervals: list of floats, intervals proportional to each event   
     """
     i_event = 0
     cumul_intervals = []
@@ -174,50 +174,39 @@ def pick_event(event_intervals):
 
 class BaseModel(object):
     """
-    BaseModel is a compartmental model that
-    implements a system of differential equations
-    that connects the populations of the different
+    BaseModel is a compartmental model that implements a system of
+    differential equations that connects the populations of the different
     compartments.
 
-    Most connections between compartments are
-    of the double-entry book-keeping type where
-    losses in one compartments are taken up
-    from another compartment.
+    Most connections between compartments are of the double-entry book-keeping
+    type where losses in one compartments are taken up from another
+    compartment.
 
-    In order to handle all the connections without
-    putting too much of a burden on the programmer
-    the differential equations are built up from
-    the individual connections rather than being
-    specified straight up.
+    In order to handle all the connections without putting too much of a
+    burden on the programmer the differential equations are built up from the
+    individual connections rather than being specified straight up.
 
-    That is dCompartment/dTime = linear function(compartment)
-
-    0) initializes compartments to initial variables
-
-    The execution loop is:
-
-    1) externally add to this.delta of compartments
-       due to extrinsic import of people, via this.transferTo
-    2) recalculate this.var - should
-       depends only on this.param and
-       current this.compartment values
-    3) Generate all events - single changes to
-       to compartments, or paired changes to two
-       compartments. The amount of changes in each
-       event should be proportional to:
-         - compartments
-         - params
-         - var
-    4) Events are added to this.delta
-    5) Deltas are multiplied by a time factor
-    6) Compartments updated
-    7) Chosen this.compartments and this.var at
-       the given time-point
-       to be saved in this.solutions
-
-    Basic concepts
-      self.vars - values that are calculated at every time step
-      self.params - values that remain fixed throughout the model run
+    Basic concepts:
+        self.time: current time of simulation
+        self.times: time steps where compartment values are stored
+        self.compartments: dictionary that holds current compartment populations
+        self.init_compartments: dictionary of initial compartment values
+        self.params: hard-coded numerical values
+        self.vars: values that are calculated at every time step
+        self.scaleup_fns: dictionary of functions that are used to calculate 
+            certain self.vars values
+    
+        self.dt: the time step used in simulation, usually much smaller that
+            the intervals between values in self.times 
+    
+        self.var_entry_rate_flow: dynamic growth of certain compartments (for 
+            demography)
+        self.fixed_transfer_rate_flows: connections between compartments with 
+            fixed multipliers
+        self.var_transfer_rate_flows: connections between compartments with 
+            variable multipliers
+        self.infection_death_rate_flows: extinctions from certain compartments
+        self.background_death_rate: generalized extinction across all compartments
     """
 
     def __init__(self):
@@ -231,7 +220,7 @@ class BaseModel(object):
         self.init_compartments = {}
 
         # stores the values of all parameters there should be no hard-coded
-        # values except as contained in this structure
+        # values except as contained in self.structure
         self.params = {}
 
         # stored list of time points
@@ -282,7 +271,7 @@ class BaseModel(object):
         # with active disease as a consequence of the infection, while latent
         # or preinfectious individuals should be assumed to take the
         # population-wide death rates only. Also note that for actively
-        # diseased persons, this rate is added to the population rate.) list
+        # diseased persons, self.rate is added to the population rate.) list
         # of 2-tuple (label, rate):
         #   - label: name of compartment
         #   - rate: disease specific death rate
@@ -319,11 +308,16 @@ class BaseModel(object):
 
         model_copy.scaleup_fns = copy.deepcopy(self.scaleup_fns)
 
-        model_copy.var_entry_rate_flow = copy.deepcopy(self.var_entry_rate_flow)
-        model_copy.fixed_transfer_rate_flows = copy.deepcopy(self.fixed_transfer_rate_flows)
-        model_copy.var_transfer_rate_flows = copy.deepcopy(self.var_transfer_rate_flows)
-        model_copy.infection_death_rate_flows = copy.deepcopy(self.infection_death_rate_flows)
-        model_copy.background_death_rate = copy.deepcopy(self.background_death_rate)
+        model_copy.var_entry_rate_flow = copy.deepcopy(
+            self.var_entry_rate_flow)
+        model_copy.fixed_transfer_rate_flows = copy.deepcopy(
+            self.fixed_transfer_rate_flows)
+        model_copy.var_transfer_rate_flows = copy.deepcopy(
+            self.var_transfer_rate_flows)
+        model_copy.infection_death_rate_flows = copy.deepcopy(
+            self.infection_death_rate_flows)
+        model_copy.background_death_rate = copy.deepcopy(
+            self.background_death_rate)
 
         model_copy.var_labels = copy.deepcopy(self.var_labels)
 
@@ -343,9 +337,12 @@ class BaseModel(object):
         :param end: Numerical end time
         :param delta: Interval between times
         """
-        assert type(start) is float or type(start) is int, 'Start time not specified with float'
-        assert type(end) is float or type(end) is int, 'End time not specified with a number'
-        assert type(delta) is float or type(delta) is int, 'Time increment not specified with a number'
+        assert type(start) is float or type(start) is int, \
+            'Start time not specified with float'
+        assert type(end) is float or type(end) is int, \
+            'End time not specified with a number'
+        assert type(delta) is float or type(delta) is int, \
+            'Time increment not specified with a number'
         assert end >= start, 'End time is before start time'
         self.times = []
         step = start
@@ -355,7 +352,7 @@ class BaseModel(object):
 
     def make_times_with_n_step(self, start, end, n):
         """
-        Alternative to make_times. For this one, the third argument is the number of time points required, rather than
+        Alternative to make_times. For self.one, the third argument is the number of time points required, rather than
         the step between time points.
 
         :param start: As for make_times
@@ -466,9 +463,9 @@ class BaseModel(object):
         infection.
 
         Args:
-            from_label: Compartment that this flow comes from
-            to_label: Compartment that this flow goes into
-            param_label: String of the parameter to be used for setting this transition rate
+            from_label: Compartment that self.flow comes from
+            to_label: Compartment that self.flow goes into
+            param_label: String of the parameter to be used for setting self.transition rate
         """
 
         assert type(from_label) is str, 'Origin compartment label not string for setting fixed transfer rate'
@@ -482,9 +479,9 @@ class BaseModel(object):
         of infection).
 
         Args:
-            from_label: Compartment that this flow comes from
-            to_label: Compartment that this flow goes into
-            param_label: String of the parameter to be used for setting this transition rate
+            from_label: Compartment that self.flow comes from
+            to_label: Compartment that self.flow goes into
+            param_label: String of the parameter to be used for setting self.transition rate
         """
 
         assert type(from_label) is str, 'Origin compartment label not string for setting variable transfer rate'
@@ -497,8 +494,8 @@ class BaseModel(object):
         Set variable entry rate to model, to be used for new births into the population (and migration if required).
 
         Args:
-            label: Compartment that this flow goes in to
-            var_label: String of the var to be used for setting this entry rate
+            label: Compartment that self.flow goes in to
+            var_label: String of the var to be used for setting self.entry rate
         """
 
         assert type(label) is str, 'Destination compartment label not string for setting variable transfer rate'
@@ -625,7 +622,7 @@ class BaseModel(object):
     def integrate(self, method='explicit'):
         """
         Master integration function to prepare for integration run and then call the process to actually run the
-        integration process according to the process selected in the arguments to this method.
+        integration process according to the process selected in the arguments to self.method.
 
         :param method: Either 'explicit' or 'scipy' to select the integration process required
         """
@@ -682,8 +679,8 @@ class BaseModel(object):
         will be removed from self.compartments[from_label] to
         self.compartments[to_label]
 
-        If from_label == None, this is an entry event
-        If to_label == None, this is an extinction event
+        If from_label == None, self.is an entry event
+        If to_label == None, self.is an extinction event
         """
 
         self.events = []
@@ -725,6 +722,33 @@ class BaseModel(object):
         Run a continuous stochastic simulation. This uses the Gillespie algorithm
         to simulate events. Between the set times, dt is estimated by the
         rates found in self.events
+
+            That is dCompartment/dTime = linear function(compartment)
+
+        0) initializes compartments to initial variables
+
+        The execution loop is:
+
+        1) externally add to self.delta of compartments
+           due to extrinsic import of people, via self.transferTo
+        2) calculate self.vars - should
+           depends only on self.params and
+           current self.compartments values
+        3) Generate all events - single changes to
+           to compartments, or paired changes to two
+           compartments. The amount of changes in each
+           event should be proportional to:
+             - compartments
+             - params
+             - var
+        4) Events are added to self.delta
+        5) Deltas are multiplied by a time factor
+        6) Compartments updated
+        7) Chosen self.compartments and self.var at
+           the given time-point
+           to be saved in self.solutions
+
+
         """
 
         self.init_run()
@@ -902,7 +926,7 @@ class BaseModel(object):
         Args:
             label: String for the name of the compartment of interest
         Returns:
-            List of values for this compartment's values over time
+            List of values for self.compartment's values over time
         """
 
         assert self.soln_array is not None, 'calculate_diagnostics has not been run'
@@ -916,7 +940,7 @@ class BaseModel(object):
         Args:
             label: String for the name of the var of interest
         Returns:
-            List of values for this var's values over time
+            List of values for self.var's values over time
         """
 
         assert self.var_array is not None, 'calculate_diagnostics has not been run'
@@ -928,7 +952,7 @@ class BaseModel(object):
         Find the values of a compartment's flows over the time steps of the integration
 
         :param label: String for the name of the compartment of interest
-        :return: List of values for this compartment's flows over time
+        :return: List of values for self.compartment's flows over time
         """
 
         assert self.flow_array is not None, 'calculate_diagnostics has not been run'
