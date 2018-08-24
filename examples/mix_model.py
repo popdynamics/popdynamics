@@ -8,7 +8,6 @@ compartmental structure.
 
 from __future__ import print_function
 from __future__ import division
-from builtins import zip
 from past.utils import old_div
 
 import copy
@@ -111,7 +110,7 @@ class SirModel(basepop.BaseModel):
 def plot_overlays(times, solutions, ylabel, title, png):
     """
     :param times: list of [Float]
-    :param solutions: list of ["key": Array(Float)] where "key" is in legend
+    :param solutions: list of ["key": Array(Float)] to plot
     :param png: name of output file
     """
     colors = []
@@ -153,8 +152,8 @@ n_day_stochastic = 10
 n_day = 50
 
 # run the model stochastically for n_day_stochastic 
-model1 = SirModel({'population': 400})
-model1.make_times(0, n_day_stochastic, 0.1)
+model1 = SirModel({'start_population': 100})
+model1.make_times(0, n_day_stochastic, 0.2)
 model1.integrate('discrete_time_stochastic')
 
 # copy the model

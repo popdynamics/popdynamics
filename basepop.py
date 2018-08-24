@@ -216,12 +216,11 @@ class BaseModel(object):
 
     The execution loop is:
 
-        1) calculate self.vars - should depends only on self.params and
-             self.compartments
-        2) Assign values to transfers between compartments from self.vars
-             or self.params
+        1) calculate self.vars - depends only on self.params and self.compartments
+        2) Assign transfers between compartments, depends on self.vars,
+             self.scaleup_fns and self.params
         3) Determine self.flows for compartments from transfers
-        4) Update self.compartments from sefl.flows
+        4) Update self.compartments from self.flows
         5) Save to self.soln_arrray
 
     """
@@ -323,14 +322,15 @@ class BaseModel(object):
 
         model_copy.scaleup_fns = copy.deepcopy(self.scaleup_fns)
 
-        model_copy.var_entry_rate_flow = copy.deepcopy(
-            self.var_entry_rate_flow)
         model_copy.fixed_transfer_rate_flows = copy.deepcopy(
             self.fixed_transfer_rate_flows)
         model_copy.var_transfer_rate_flows = copy.deepcopy(
             self.var_transfer_rate_flows)
         model_copy.infection_death_rate_flows = copy.deepcopy(
             self.infection_death_rate_flows)
+
+        model_copy.var_entry_rate_flow = copy.deepcopy(
+            self.var_entry_rate_flow)
         model_copy.background_death_rate = copy.deepcopy(
             self.background_death_rate)
 
@@ -730,6 +730,9 @@ class BaseModel(object):
         n_sample = 0
         for i_time, new_time in enumerate(self.target_times):
 
+            if i_time == 0:
+                continue
+
             while time < new_time:
                 self.time = time
                 self.calculate_vars()
@@ -761,16 +764,16 @@ class BaseModel(object):
                 time += dt
                 n_sample += 1
 
-            if i_time < n_time - 1:
+            if i_time < n_time:
                 y = self.convert_compartments_to_list(self.compartments)
-                self.soln_array[i_time + 1, :] = y
+                self.soln_array[i_time, :] = y
 
     def integrate_discrete_time_stochastic(self, y, dt=1):
         """
         Run a discrete-time stochastic simulation. This uses the Tau-leaping
         extension to the Gillespie algorithm, with a Poisson estimator
         to estimate multiple events in a time-interval. dt is set
-        for each interval
+        between time intervals.
         """
         self.compartments = self.convert_list_to_compartments(y)
 
@@ -780,41 +783,45 @@ class BaseModel(object):
 
         time = self.target_times[0]
         self.soln_array[0, :] = y
+
         for i_time, new_time in enumerate(self.target_times):
 
-            while time < new_time:
+            if i_time == 0:
+                continue
 
-                self.time = time
-                self.calculate_vars()
-                self.calculate_events()
+            dt = new_time - self.target_times[i_time - 1]
 
-                for event in self.events:
-                    from_label, to_label, rate = event
+            self.time = time
+            self.calculate_vars()
+            self.calculate_events()
 
-                    mean = rate * dt
-                    delta_population = numpy.random.poisson(mean, 1)[0]
+            for event in self.events:
+                from_label, to_label, rate = event
 
-                    if from_label and to_label:
-                        if delta_population > self.compartments[from_label]:
-                            delta_population = self.compartments[from_label]
-                        self.compartments[from_label] -= delta_population
-                        self.compartments[to_label] += delta_population
-                    elif to_label is None:
-                        # death
-                        if delta_population > self.compartments[from_label]:
-                            delta_population = self.compartments[from_label]
-                        self.compartments[from_label] -= delta_population
-                    elif from_label is None:
-                        # birth
-                        self.compartments[to_label] += delta_population
+                mean = rate * dt
+                delta_population = numpy.random.poisson(mean, 1)[0]
 
-                self.checks()
+                if from_label and to_label:
+                    if delta_population > self.compartments[from_label]:
+                        delta_population = self.compartments[from_label]
+                    self.compartments[from_label] -= delta_population
+                    self.compartments[to_label] += delta_population
+                elif to_label is None:
+                    # death
+                    if delta_population > self.compartments[from_label]:
+                        delta_population = self.compartments[from_label]
+                    self.compartments[from_label] -= delta_population
+                elif from_label is None:
+                    # birth
+                    self.compartments[to_label] += delta_population
 
-                time += dt
+            self.checks()
 
-            if i_time < n_time - 1:
+            time += dt
+
+            if i_time < n_time:
                 y = self.convert_compartments_to_list(self.compartments)
-                self.soln_array[i_time + 1, :] = y
+                self.soln_array[i_time, :] = y
 
     def integrate(self, method='explicit'):
         """
