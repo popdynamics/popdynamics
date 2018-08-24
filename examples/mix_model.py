@@ -152,9 +152,9 @@ n_day_stochastic = 10
 n_day = 50
 
 # run the model stochastically for n_day_stochastic 
-model1 = SirModel({'start_population': 100})
+model1 = SirModel({'start_population': 30})
 model1.make_times(0, n_day_stochastic, 0.2)
-model1.integrate('discrete_time_stochastic')
+model1.integrate('continuous_time_stochastic')
 
 # copy the model
 model2 = model1.clone()

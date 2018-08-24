@@ -73,7 +73,7 @@ class SirModel(basepop.BaseModel):
         basepop.BaseModel.__init__(self)
 
         default_params = {
-            "population": 200,
+            "population": 50,
             "start_infectious": 1.,
             "r0": 12.,
             "duration_preinfectious": 8.,
@@ -262,7 +262,7 @@ n_replica = 20
 models = []
 for i in range(n_replica):
     new_model = SirModel()
-    new_model.make_times(0, 50, 0.2)
+    new_model.make_times(0, 50, 1)
     new_model.integrate('continuous_time_stochastic')
     models.append(new_model)
 generate_output(models, out_dir, "discrete_stochastic")
@@ -272,7 +272,7 @@ n_replica = 20
 models = []
 for i in range(n_replica):
     new_model = SirModel()
-    new_model.make_times(0, 50, 0.2)
+    new_model.make_times(0, 50, 1)
     new_model.integrate('discrete_time_stochastic')
     models.append(new_model)
 generate_output(models, out_dir, "continuous_stochastic")
