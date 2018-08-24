@@ -154,9 +154,8 @@ n_day = 50
 
 # run the model stochastically for n_day_stochastic 
 model1 = SirModel({'population': 400})
-model1.make_times(0, n_day_stochastic, 1)
-# run stochastically
-model1.integrate_continuous_stochastic()
+model1.make_times(0, n_day_stochastic, 0.1)
+model1.integrate('discrete_time_stochastic')
 
 # copy the model
 model2 = model1.clone()
@@ -164,7 +163,6 @@ model2 = model1.clone()
 # as the inital compartment values of the new model
 model2.init_compartments = copy.deepcopy(model2.compartments)
 model2.make_times(n_day_stochastic, n_day, 1)
-# run continuously
 model2.integrate()
 
 # splice the times and solutions of the two models together
@@ -179,9 +177,9 @@ for model in [model1, model2]:
             solution[key] = numpy.concatenate(
                 (solution[key], new_solution[1:]), axis=0)
     if times is None:
-        times = copy.deepcopy(model.times)
+        times = copy.deepcopy(model.target_times)
     else:
-        times.extend(model.times[1:])
+        times.extend(model.target_times[1:])
 
 plot_overlays(
     times,

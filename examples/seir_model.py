@@ -216,9 +216,9 @@ def plot_epidemiological_indicators(model, indicators, png, ylog=False):
     pylab.clf()
     for var_key in indicators:
         if not ylog:
-            pylab.plot(model.times, model.get_var_soln(var_key), label=var_key)
+            pylab.plot(model.target_times, model.get_var_soln(var_key), label=var_key)
         else:
-            pylab.semilogy(model.times, model.get_var_soln(var_key), label=var_key)
+            pylab.semilogy(model.target_times, model.get_var_soln(var_key), label=var_key)
     pylab.legend()
     pylab.ylabel("per day (except prevalence), per person")
     pylab.title("Indicators")
@@ -232,7 +232,7 @@ def plot_compartment_sizes(model, png):
     pylab.clf()
     for compartment in model.compartments:
         soln = model.get_compartment_soln(compartment)
-        pylab.plot(model.times, soln, label=compartment)
+        pylab.plot(model.target_times, soln, label=compartment)
     pylab.legend()
     pylab.ylabel("persons")
     pylab.title("Populations")
@@ -246,9 +246,9 @@ def plot_compartment_proportions(model, png):
         soln = model.get_compartment_soln(compartment)
         population = model.get_var_soln("population")
         compartment_props[compartment] = [i / j for i, j in zip(soln, population)]
-        pylab.plot(model.times, compartment_props[compartment], label=compartment)
+        pylab.plot(model.target_times, compartment_props[compartment], label=compartment)
     r_n = [i * infection_params["flu"]["r0"] for i in compartment_props["susceptible"]]
-    pylab.plot(model.times, r_n, label="Rn")
+    pylab.plot(model.target_times, r_n, label="Rn")
     pylab.title("Compartment proportions (and Rn)")
     pylab.legend()
     pylab.savefig(png)
@@ -268,7 +268,7 @@ def plot_cyclical_epidemics(model, out_dir):
     fig = pylab.figure()
     ax1 = fig.add_subplot(111)
     ax1.plot(
-        model.times[365 * 40:],
+        model.target_times[365 * 40:],
         model.get_var_soln('incidence')[365 * 40:],
         label='incidence',
         color='r')
@@ -276,7 +276,7 @@ def plot_cyclical_epidemics(model, out_dir):
     ax1.set_ylim(bottom=0.)
     ax1.legend(loc=2)
     ax2 = ax1.twinx()
-    ax2.plot(model.times[365 * 40:], r_n[365 * 40:], label='Rn')
+    ax2.plot(model.target_times[365 * 40:], r_n[365 * 40:], label='Rn')
     ax2.set_ylabel('Rn')
     ax2.set_ylim([0.5, 1.5])
     ax2.legend(loc=0)
@@ -287,7 +287,7 @@ def plot_cyclical_epidemics(model, out_dir):
     fig = pylab.figure()
     ax1 = fig.add_subplot(111)
     ax1.plot(
-        model.times[365 * 40:],
+        model.target_times[365 * 40:],
         model.get_var_soln('incidence')[365 * 40:],
         label='incidence',
         color='r')
@@ -296,7 +296,7 @@ def plot_cyclical_epidemics(model, out_dir):
     ax1.legend(loc=2)
     ax2 = ax1.twinx()
     ax2.plot(
-        model.times[365 * 40:],
+        model.target_times[365 * 40:],
         props['susceptible'][365 * 40:],
         label='susceptible')
     ax2.set_ylabel('proportion susceptible')
@@ -309,7 +309,7 @@ def plot_cyclical_epidemics(model, out_dir):
     fig = pylab.figure()
     ax1 = fig.add_subplot(111)
     ax1.plot(
-        model.times[365 * 40:],
+        model.target_times[365 * 40:],
         model.get_var_soln('incidence')[365 * 40:],
         label='incidence',
         color='r')
@@ -318,7 +318,7 @@ def plot_cyclical_epidemics(model, out_dir):
     ax1.legend(loc=2)
     ax2 = ax1.twinx()
     ax2.plot(
-        model.times[365 * 40:],
+        model.target_times[365 * 40:],
         props['immune'][365 * 40:],
         label='immune')
     ax2.set_ylabel('proportion immune')

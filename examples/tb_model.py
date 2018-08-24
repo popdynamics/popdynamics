@@ -196,8 +196,8 @@ def make_plots(model, out_dir):
     # scaling case detection rate
     pylab.clf()
     scaleup_fn = model.scaleup_fns['program_rate_detect']
-    y_vals = list(map(scaleup_fn, model.times))
-    pylab.plot(model.times, y_vals)
+    y_vals = list(map(scaleup_fn, model.target_times))
+    pylab.plot(model.target_times, y_vals)
     pylab.title('scaleup program_rate_detect curve')
     pylab.savefig(os.path.join(out_dir, 'scaleup.png'))
 
@@ -205,7 +205,7 @@ def make_plots(model, out_dir):
     pylab.clf()
     for var_key in ['mortality', 'incidence', 'prevalence']:
         soln = model.get_var_soln(var_key)
-        pylab.plot(model.times, soln, label=var_key)
+        pylab.plot(model.target_times, soln, label=var_key)
     pylab.legend()
     pylab.savefig(os.path.join(out_dir, 'fraction.png'))
 

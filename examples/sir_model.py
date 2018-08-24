@@ -207,7 +207,7 @@ def plot_epidemiological_indicators(models, png):
         for indicator in indicators:
             solution[indicator] = model.get_var_soln(indicator)
         solutions.append(solution)
-        times = model.times
+        times = model.target_times
     plot_overlays(
         times, solutions, "per day (except prevalence), per person",
         "Indicators", png)
@@ -217,7 +217,7 @@ def plot_rn(models, png):
     solutions = []
     for model in models:
         r0 = model.params["r0"]
-        times = model.times
+        times = model.target_times
         susceptibles = model.get_compartment_soln("susceptible")
         populations = model.get_var_soln("population")
         proportions = [old_div(i, j) for i, j in zip(susceptibles, populations)]
@@ -233,7 +233,7 @@ def plot_populations(models, png):
         for key in model.compartments.keys():
             solution[key] = model.get_compartment_soln(key)
         solutions.append(solution)
-    plot_overlays(models[0].times, solutions, "persons", "Populations", png)
+    plot_overlays(models[0].target_times, solutions, "persons", "Populations", png)
 
 
 def generate_output(models, out_dir, modifier):
@@ -263,9 +263,9 @@ models = []
 for i in range(n_replica):
     new_model = SirModel()
     new_model.make_times(0, 50, 1)
-    new_model.integrate_continuous_stochastic()
+    new_model.integrate('continuous_time_stochastic')
     models.append(new_model)
-generate_output(models, out_dir, "discrete")
+generate_output(models, out_dir, "discrete_stochastic")
 
 # stochastic discrete-time models
 n_replica = 20
@@ -273,9 +273,9 @@ models = []
 for i in range(n_replica):
     new_model = SirModel()
     new_model.make_times(0, 50, 1)
-    new_model.integrate_continuous_stochastic()
+    new_model.integrate('discrete_time_stochastic')
     models.append(new_model)
-generate_output(models, out_dir, "continuous")
+generate_output(models, out_dir, "continuous_stochastic")
 
 basepop.open_pngs_in_dir(out_dir)
 

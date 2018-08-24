@@ -177,7 +177,7 @@ def plot_populations(models, png):
             color = colors[i % len(colors)]
             if i_model == 0:
                 pylab.plot([0], [0], label=compartment, color=color[:3])
-            pylab.plot(model.times, soln, linewidth=2, color=color)
+            pylab.plot(model.target_times, soln, linewidth=2, color=color)
             y_max = max(soln.max(), y_max)
 
     pylab.ylim([0, y_max * 1.1])
@@ -224,7 +224,7 @@ for i_sim in range(n_replica):
         print("Processed", i_sim, "replicas")
     model = StrainsModel()
     model.make_times(0, 1000, 1)
-    model.integrate_continuous_stochastic()
+    model.integrate('continuous_time_stochastic')
     models.append(model)
 
 # Generate output

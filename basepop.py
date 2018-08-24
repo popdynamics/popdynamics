@@ -5,7 +5,6 @@ Base Population Model to handle different type of models
 
 from __future__ import print_function
 from __future__ import division
-from builtins import zip
 from builtins import range
 from builtins import object
 from past.utils import old_div
@@ -154,8 +153,9 @@ def make_two_step_curve(y_low, y_med, y_high, x_start, x_med, x_end):
 def pick_event(event_intervals):
     """
     Returns a randomly selected index of an event from a list of intervals
+    proportional to the events' probabilities
 
-    :param event_intervals: list of floats, intervals proportional to each event   
+    :param event_intervals: list of event intervals
     """
     i_event = 0
     cumul_intervals = []
@@ -187,26 +187,43 @@ class BaseModel(object):
     individual connections rather than being specified straight up.
 
     Basic concepts:
+        self.target_times: time steps where model values are stored
+
+        self.dt: the time step used in simulation, usually much smaller that
+            the intervals between values in self.target_times
+
         self.time: current time of simulation
-        self.times: time steps where compartment values are stored
         self.compartments: dictionary that holds current compartment populations
+
         self.init_compartments: dictionary of initial compartment values
+
+        self.flows: dictionary that holds current compartment flows
+
         self.params: hard-coded numerical values
         self.vars: values that are calculated at every time step
         self.scaleup_fns: dictionary of functions that are used to calculate 
             certain self.vars values
     
-        self.dt: the time step used in simulation, usually much smaller that
-            the intervals between values in self.times 
-    
-        self.var_entry_rate_flow: dynamic growth of certain compartments (for 
-            demography)
-        self.fixed_transfer_rate_flows: connections between compartments with 
+        self.fixed_transfer_rate_flows: connections between compartments with
             fixed multipliers
         self.var_transfer_rate_flows: connections between compartments with 
             variable multipliers
         self.infection_death_rate_flows: extinctions from certain compartments
+
+        (for demography)
+        self.var_entry_rate_flow: dynamic growth of certain compartments
         self.background_death_rate: generalized extinction across all compartments
+
+    The execution loop is:
+
+        1) calculate self.vars - should depends only on self.params and
+             self.compartments
+        2) Assign values to transfers between compartments from self.vars
+             or self.params
+        3) Determine self.flows for compartments from transfers
+        4) Update self.compartments from sefl.flows
+        5) Save to self.soln_arrray
+
     """
 
     def __init__(self):
@@ -224,7 +241,7 @@ class BaseModel(object):
         self.params = {}
 
         # stored list of time points
-        self.times = []
+        self.target_times = []
         self.time = 0
         self.start_time = 0
 
@@ -280,25 +297,23 @@ class BaseModel(object):
         # the generalised death rate of all compartments
         self.background_death_rate = 0.
 
-        # other universally required model attributes
-
-        # array to store self.compartment values over self.times
+        # array to store self.compartment values over self.target_times
+        # for the simulation
         self.soln_array = None
 
+        # calculated during diagnostics for self.target_times
+        # array to store flow values over self.labels
+        self.flow_array = None
+        # array to store self.vars values over self.var_labels
+        self.var_array = None
         # array to self.vars keys
         self.var_labels = None
 
-        # array to store self.vars values over self.times
-        self.var_array = None
-
-        # array to store compartment self.flows of compartment values over self.times
-        self.flow_array = None
-
     def clear_solns(self):
-        self.var_labels = None
         self.soln_array = None
-        self.var_array = None
         self.flow_array = None
+        self.var_labels = None
+        self.var_array = None
 
     def clone(self):
         model_copy = type(self)()
@@ -329,7 +344,7 @@ class BaseModel(object):
 
     def make_times(self, start, end, delta):
         """
-        Make self.times, a list of times for integration to be performed at.
+        Make self.target_times, a list of times for integration to be performed at.
         Units are arbitrary.
 
         :param start: Numerical time to start at (can be a calendar year, or zero
@@ -344,26 +359,27 @@ class BaseModel(object):
         assert type(delta) is float or type(delta) is int, \
             'Time increment not specified with a number'
         assert end >= start, 'End time is before start time'
-        self.times = []
+        self.target_times = []
         step = start
         while step <= end:
-            self.times.append(step)
+            self.target_times.append(step)
             step += delta
 
     def make_times_with_n_step(self, start, end, n):
         """
-        Alternative to make_times. For self.one, the third argument is the number of time points required, rather than
-        the step between time points.
+        Alternative to make_times. For self.one, the third argument is the
+        number of time points required, rather than the step between time
+        points.
 
         :param start: As for make_times
         :param end: As for make_times
         :param n: Number of time points that are needed
         """
-        self.times = []
+        self.target_times = []
         step = start
         delta = old_div((end - start), float(n))
         while step <= end:
-            self.times.append(step)
+            self.target_times.append(step)
             step += delta
 
     def set_compartment(self, label, init_val=0.):
@@ -388,7 +404,7 @@ class BaseModel(object):
         :param val: Value (generally float) for the parameter
         """
         assert type(label) is str, 'Parameter name "%s" is not string' % label
-        assert type(val) is float or type(val) is int, 'Fixed parameter value is not numeric for %' % label
+        assert type(val) is float or type(val) is int, 'Fixed parameter value is not numeric for %s' % label
         self.params[label] = val
 
     def convert_list_to_compartments(self, vec):
@@ -474,9 +490,11 @@ class BaseModel(object):
 
     def set_var_transfer_rate_flow(self, from_label, to_label, var_label):
         """
-        Set variable inter-compartmental flow - as can be used for setting predictable time-variant inter-compartmental
-        flows (such as scale-up functions) or for those that have to be calculated from the model (such as the force
-        of infection).
+
+        Set variable inter-compartmental flow - as can be used for setting
+        predictable time-variant inter-compartmental flows (such as scale-up
+        functions) or for those that have to be calculated from the model (such
+        as the force of infection).
 
         Args:
             from_label: Compartment that self.flow comes from
@@ -596,12 +614,9 @@ class BaseModel(object):
         """
         pass
 
-    def init_run(self):
+    def check_flow_transfers(self):
         """
-        Starting method to integration processes
         """
-        self.clear_solns()
-
         self.set_flows()
         # check that each compartment has at least one entry flow or exit flow
         # (i.e. that all compartments are connected to the model)
@@ -619,26 +634,6 @@ class BaseModel(object):
             msg = 'Compartment "%s" doesn\'t have any entry or transfer flows' % label
             assert label in connected_compartments, msg
 
-    def integrate(self, method='explicit'):
-        """
-        Master integration function to prepare for integration run and then call the process to actually run the
-        integration process according to the process selected in the arguments to self.method.
-
-        :param method: Either 'explicit' or 'scipy' to select the integration process required
-        """
-
-        self.init_run()
-        assert self.times is not None, 'Haven\'t set times yet'
-        derivative = self.make_derivate_fn()
-        y = self.get_init_list()
-        if method == 'explicit':
-            self.integrate_explicit(y, derivative)
-        elif method == 'scipy':
-            if 'scipy' not in sys.modules:
-                raise Exception("scipy module was not loaded")
-            self.soln_array = odeint(derivative, y, self.times)
-        self.calculate_diagnostics()
-
     def integrate_explicit(self, y, derivative, min_dt=0.05):
         """
         Integrate with Euler explicit method
@@ -648,12 +643,12 @@ class BaseModel(object):
         """
 
         n_component = len(y)
-        n_time = len(self.times)
+        n_time = len(self.target_times)
         self.soln_array = numpy.zeros((n_time, n_component))
 
-        time = self.times[0]
+        time = self.target_times[0]
         self.soln_array[0, :] = y
-        for i_time, new_time in enumerate(self.times):
+        for i_time, new_time in enumerate(self.target_times):
             while time < new_time:
                 f = derivative(y, time)
                 old_time = time
@@ -717,55 +712,23 @@ class BaseModel(object):
                 self.vars['rate_infection_death'] += val
                 self.events.append((label, None, val))
 
-    def integrate_continuous_stochastic(self):
+    def integrate_continuous_time_stochastic(self, y):
         """
-        Run a continuous stochastic simulation. This uses the Gillespie algorithm
-        to simulate events. Between the set times, dt is estimated by the
-        rates found in self.events
-
-            That is dCompartment/dTime = linear function(compartment)
-
-        0) initializes compartments to initial variables
-
-        The execution loop is:
-
-        1) externally add to self.delta of compartments
-           due to extrinsic import of people, via self.transferTo
-        2) calculate self.vars - should
-           depends only on self.params and
-           current self.compartments values
-        3) Generate all events - single changes to
-           to compartments, or paired changes to two
-           compartments. The amount of changes in each
-           event should be proportional to:
-             - compartments
-             - params
-             - var
-        4) Events are added to self.delta
-        5) Deltas are multiplied by a time factor
-        6) Compartments updated
-        7) Chosen self.compartments and self.var at
-           the given time-point
-           to be saved in self.solutions
-
-
+        Run a continuous-time stochastic simulation. This uses the Gillespie
+        algorithm to pick a random event out of an set of event rates. The dt
+        is estimated from the rates. Events are picked between set time-points
+        until the dt fills out the time interval.
         """
-
-        self.init_run()
-
-        assert self.times is not None, 'Haven\'t set times yet'
-
-        y = self.get_init_list()
         self.compartments = self.convert_list_to_compartments(y)
 
         n_compartment = len(y)
-        n_time = len(self.times)
+        n_time = len(self.target_times)
         self.soln_array = numpy.zeros((n_time, n_compartment))
 
-        time = self.times[0]
+        time = self.target_times[0]
         self.soln_array[0, :] = y
         n_sample = 0
-        for i_time, new_time in enumerate(self.times):
+        for i_time, new_time in enumerate(self.target_times):
 
             while time < new_time:
                 self.time = time
@@ -802,30 +765,22 @@ class BaseModel(object):
                 y = self.convert_compartments_to_list(self.compartments)
                 self.soln_array[i_time + 1, :] = y
 
-        self.calculate_diagnostics()
-
-    def integrate_discrete_time_stochastic(self, dt=1):
+    def integrate_discrete_time_stochastic(self, y, dt=1):
         """
         Run a discrete-time stochastic simulation. This uses the Tau-leaping
         extension to the Gillespie algorithm, with a Poisson estimator
         to estimate multiple events in a time-interval. dt is set
         for each interval
         """
-
-        self.init_run()
-
-        assert self.times is not None, 'Haven\'t set times yet'
-
-        y = self.get_init_list()
         self.compartments = self.convert_list_to_compartments(y)
 
         n_compartment = len(y)
-        n_time = len(self.times)
+        n_time = len(self.target_times)
         self.soln_array = numpy.zeros((n_time, n_compartment))
 
-        time = self.times[0]
+        time = self.target_times[0]
         self.soln_array[0, :] = y
-        for i_time, new_time in enumerate(self.times):
+        for i_time, new_time in enumerate(self.target_times):
 
             while time < new_time:
 
@@ -861,14 +816,48 @@ class BaseModel(object):
                 y = self.convert_compartments_to_list(self.compartments)
                 self.soln_array[i_time + 1, :] = y
 
-        self.calculate_diagnostics()
+    def integrate(self, method='explicit'):
+        """
+        Master integration function to prepare for integration run and
+        then call the process to actually run the integration process
+        according to the process selected
 
+        :param method: string to determine integration method
+            - 'explicit'
+            - 'scipy'
+            - 'continuous_time_stochastic'
+            - 'discrete_time_stochastic'
+        """
+
+        # Check if times have been set
+        assert bool(self.target_times), 'Haven\'t set times yet'
+
+        self.clear_solns()
+        self.check_flow_transfers()
+        y = self.get_init_list()
+
+        if method == 'explicit':
+            derivative = self.make_derivate_fn()
+            self.integrate_explicit(y, derivative)
+
+        elif method == 'scipy':
+            if 'scipy' not in sys.modules:
+                raise Exception("scipy module was not loaded")
+            derivative = self.make_derivate_fn()
+            self.soln_array = odeint(derivative, y, self.target_times)
+
+        elif method == 'continuous_time_stochastic':
+            self.integrate_continuous_time_stochastic(y)
+
+        elif method == 'discrete_time_stochastic':
+            self.integrate_discrete_time_stochastic(y)
+
+        self.calculate_diagnostics()
 
     def calculate_diagnostic_vars(self):
         """
         Calculate diagnostic vars that can depend on self.flows as well as self.vars calculated in calculate_vars
         """
-
         pass
 
     def calculate_diagnostics(self):
@@ -883,10 +872,10 @@ class BaseModel(object):
                 continue
             self.population_soln[label] = self.get_compartment_soln(label)
 
-        n_time = len(self.times)
+        n_time = len(self.target_times)
         for i in range(n_time):
 
-            self.time = self.times[i]
+            self.time = self.target_times[i]
 
             for label in self.labels:
                 self.compartments[label] = self.population_soln[label][i]
@@ -967,7 +956,7 @@ class BaseModel(object):
         :param i_time: The index of the list of times to load from
         """
 
-        self.time = self.times[i_time]
+        self.time = self.target_times[i_time]
         for i_label, label in enumerate(self.labels):
             self.compartments[label] = \
                 self.soln_array[i_time, i_label]
@@ -1070,7 +1059,7 @@ class BaseModel(object):
         """
 
         self.calculate_diagnostics()
-        times = self.times
+        times = self.target_times
         fraction = self.fraction_soln[label]
         i = -2
         max_fraction_diff = 0
