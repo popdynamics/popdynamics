@@ -10,8 +10,6 @@ from __future__ import print_function
 from __future__ import division
 from past.utils import old_div
 
-import copy
-import numpy
 import pylab
 import matplotlib
 
@@ -48,7 +46,7 @@ class SirModel(basepop.BaseModel):
         default_params = {
             "start_population": 1000,
             "start_infectious": 1.,
-            "r0": 12.,
+            "r0": 5.,
             "duration_preinfectious": 8.,
             "duration_infectious": 7.,
             "life_expectancy": 70. * 365.
@@ -148,17 +146,36 @@ def plot_overlays(times, solutions, ylabel, title, png):
 out_dir = "mix_sir_graphs"
 basepop.ensure_out_dir(out_dir)
 
-n_day_stochastic = 10
-n_day = 50
-
-model = SirModel({'start_population': 30})
+model = SirModel({'start_population': 300})
 
 # run the model stochastically for n_day_stochastic
-model.make_times(0, n_day_stochastic, 0.2)
-model.integrate('continuous_time_stochastic')
+n_day_start = 0
+n_day_step = 1
+n_day_end = n_day_step
+n_day_final = 50
+method = 'explicit'
+dt = 1
+method = 'discrete_time_stochastic'
+dt = 0.2
+print('run', method, n_day_start, n_day_end, dt)
+model.make_times(n_day_start, n_day_end, dt)
+model.integrate(method=method)
 
-model.make_times(n_day_stochastic, n_day, 1)
-model.integrate(is_continue=True)
+while n_day_end < n_day_final:
+    n_day_start = n_day_end
+    n_day_end = min(n_day_final, n_day_start + n_day_step)
+    min_pop = min(model.compartments.values())
+    if min_pop > 5:
+        method = 'explicit'
+        dt = 1
+    else:
+        method = 'discrete_time_stochastic'
+        dt = 0.2
+        # method = 'explicit'
+        # dt = 1
+    print('run', method, n_day_start, n_day_end, dt, min_pop, model.compartments)
+    model.make_times(n_day_start, n_day_end, dt)
+    model.integrate(method=method, is_continue=True)
 
 solution = {}
 for key in model.compartments.keys():

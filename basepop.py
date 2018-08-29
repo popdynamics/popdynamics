@@ -650,6 +650,8 @@ class BaseModel(object):
         time = self.target_times[0]
         self.soln_array[0, :] = y
         for i_time, new_time in enumerate(self.target_times):
+            if i_time == 0:
+                continue
             while time < new_time:
                 f = derivative(y, time)
                 old_time = time
@@ -663,8 +665,7 @@ class BaseModel(object):
                     # hack to avoid errors due to time-step
                     if y[i] < 0.:
                         y[i] = 0.
-            if i_time < n_time - 1:
-                self.soln_array[i_time + 1, :] = y
+            self.soln_array[i_time, :] = y
 
     def calculate_events(self):
         """
@@ -769,7 +770,7 @@ class BaseModel(object):
                 y = self.convert_compartments_to_list(self.compartments)
                 self.soln_array[i_time, :] = y
 
-    def integrate_discrete_time_stochastic(self, y, dt=1):
+    def integrate_discrete_time_stochastic(self, y):
         """
         Run a discrete-time stochastic simulation. This uses the Tau-leaping
         extension to the Gillespie algorithm, with a Poisson estimator
@@ -864,6 +865,8 @@ class BaseModel(object):
         elif method == 'discrete_time_stochastic':
             self.integrate_discrete_time_stochastic(y)
 
+        print("Basemodel.integrate", len(self.target_times), self.soln_array.shape)
+
         if is_continue:
             self.soln_array = numpy.concatenate(
                 (self.save_soln_array, self.soln_array[1:]), 0)
@@ -891,10 +894,14 @@ class BaseModel(object):
                 continue
             self.population_soln[label] = self.get_compartment_soln(label)
 
-        n_time = len(self.target_times)
+        # used as flag to build var_array after self.calculate_vars
+        # has been run
+        self.var_labels = None
+
+        n_time = len(self.times)
         for i in range(n_time):
 
-            self.time = self.target_times[i]
+            self.time = self.times[i]
 
             for label in self.labels:
                 self.compartments[label] = self.population_soln[label][i]
