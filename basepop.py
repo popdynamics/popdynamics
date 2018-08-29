@@ -242,6 +242,7 @@ class BaseModel(object):
         # stored list of time points
         self.target_times = []
         self.time = 0
+        self.times = []
         self.start_time = 0
 
         # scale-up functions, generally used for time-variant parameters,
@@ -823,7 +824,7 @@ class BaseModel(object):
                 y = self.convert_compartments_to_list(self.compartments)
                 self.soln_array[i_time, :] = y
 
-    def integrate(self, method='explicit'):
+    def integrate(self, method='explicit', is_continue=False):
         """
         Master integration function to prepare for integration run and
         then call the process to actually run the integration process
@@ -839,9 +840,13 @@ class BaseModel(object):
         # Check if times have been set
         assert bool(self.target_times), 'Haven\'t set times yet'
 
-        self.clear_solns()
-        self.check_flow_transfers()
-        y = self.get_init_list()
+        if not is_continue:
+            self.clear_solns()
+            self.check_flow_transfers()
+            y = self.get_init_list()
+        else:
+            self.save_soln_array = self.soln_array
+            y = self.convert_compartments_to_list(self.compartments)
 
         if method == 'explicit':
             derivative = self.make_derivate_fn()
@@ -858,6 +863,13 @@ class BaseModel(object):
 
         elif method == 'discrete_time_stochastic':
             self.integrate_discrete_time_stochastic(y)
+
+        if is_continue:
+            self.soln_array = numpy.concatenate(
+                (self.save_soln_array, self.soln_array[1:]), 0)
+            self.times.extend(self.target_times[1:])
+        else:
+            self.times = copy.deepcopy(self.target_times)
 
         self.calculate_diagnostics()
 

@@ -63,22 +63,16 @@ class StrainsModel(basepop.BaseModel):
             self.params[key] = value
 
         self.set_param(
-            "s0",
-            old_div(self.params["rate_birth"], self.params["rate_death"]))
+            "s0", old_div(self.params["rate_birth"],
+                          self.params["rate_death"]))
         self.set_param(
-            "beta_resident",
-            self.params["r0_resident"] *
-                (self.params["rate_recover"] +
-                 self.params["rate_infection_death"] +
-                 self.params["rate_death"]) /
-            self.params["s0"])
+            "beta_resident", self.params["r0_resident"] *
+            (self.params["rate_recover"] + self.params["rate_infection_death"]
+             + self.params["rate_death"]) / self.params["s0"])
         self.set_param(
-            "beta_invader",
-            self.params["r0_invader"] *
-                (self.params["rate_recover"] +
-                 self.params["rate_infection_death"] +
-                 self.params["rate_death"]) /
-            self.params["s0"] )
+            "beta_invader", self.params["r0_invader"] *
+            (self.params["rate_recover"] + self.params["rate_infection_death"]
+             + self.params["rate_death"]) / self.params["s0"])
 
         # define compartments and set their starting values
         self.set_compartment(
@@ -86,16 +80,11 @@ class StrainsModel(basepop.BaseModel):
             math.ceil(old_div(self.params["s0"], self.params["r0_resident"])))
         self.set_compartment(
             "infectious_resident",
-            math.floor(
-                self.params["rate_death"] /
-                self.params["beta_resident"] *
-                (self.params["r0_resident"] - 1)))
-        self.set_compartment(
-            "infectious_invader", 1)
-        self.set_compartment(
-            "recovered_resident", 0)
-        self.set_compartment(
-            "recovered_invader", 0)
+            math.floor(self.params["rate_death"] / self.params["beta_resident"]
+                       * (self.params["r0_resident"] - 1)))
+        self.set_compartment("infectious_invader", 1)
+        self.set_compartment("recovered_resident", 0)
+        self.set_compartment("recovered_invader", 0)
 
     def calculate_vars(self):
         """
@@ -125,20 +114,20 @@ class StrainsModel(basepop.BaseModel):
 
         self.set_background_death_rate("rate_death")
 
-        self.set_infection_death_rate_flow(
-            "infectious_invader", "rate_infection_death")
-        self.set_infection_death_rate_flow(
-            "infectious_resident", "rate_infection_death")
+        self.set_infection_death_rate_flow("infectious_invader",
+                                           "rate_infection_death")
+        self.set_infection_death_rate_flow("infectious_resident",
+                                           "rate_infection_death")
 
-        self.set_var_transfer_rate_flow(
-            "susceptible", "infectious_invader", "rate_infection_invader")
-        self.set_var_transfer_rate_flow(
-            "susceptible", "infectious_resident", "rate_infection_resident")
+        self.set_var_transfer_rate_flow("susceptible", "infectious_invader",
+                                        "rate_infection_invader")
+        self.set_var_transfer_rate_flow("susceptible", "infectious_resident",
+                                        "rate_infection_resident")
 
-        self.set_fixed_transfer_rate_flow(
-            "infectious_resident", "recovered_resident", "rate_recover")
-        self.set_fixed_transfer_rate_flow(
-            "infectious_invader", "recovered_invader", "rate_recover")
+        self.set_fixed_transfer_rate_flow("infectious_resident",
+                                          "recovered_resident", "rate_recover")
+        self.set_fixed_transfer_rate_flow("infectious_invader",
+                                          "recovered_invader", "rate_recover")
 
     def calculate_diagnostic_vars(self):
         """
@@ -158,7 +147,8 @@ class StrainsModel(basepop.BaseModel):
         self.vars["prevalence"] = 0.
         for label, val in list(self.compartments.items()):
             if "infectious" in label:
-                self.vars["prevalence"] += old_div(val, self.vars["population"])
+                self.vars["prevalence"] += old_div(val,
+                                                   self.vars["population"])
 
 
 def plot_populations(models, png):
@@ -198,7 +188,7 @@ def plot_extinction(models, png):
     asymptotic_prob_extinction = 1.0 * params["r0_resident"] / params["r0_invader"]
     title = "Comparing to r0_resident/r0_invader = %.3f" % asymptotic_prob_extinction
 
-    n_replica = len(models) # could be less for display purposes
+    n_replica = len(models)  # could be less for display purposes
     prob_extinction = []
     n_replica_range = list(range(1, n_replica))
     for n_replica in n_replica_range:

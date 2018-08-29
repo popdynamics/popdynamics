@@ -151,37 +151,21 @@ basepop.ensure_out_dir(out_dir)
 n_day_stochastic = 10
 n_day = 50
 
-# run the model stochastically for n_day_stochastic 
-model1 = SirModel({'start_population': 30})
-model1.make_times(0, n_day_stochastic, 0.2)
-model1.integrate('continuous_time_stochastic')
+model = SirModel({'start_population': 30})
 
-# copy the model
-model2 = model1.clone()
-# use the last compartment values of the old model
-# as the inital compartment values of the new model
-model2.init_compartments = copy.deepcopy(model2.compartments)
-model2.make_times(n_day_stochastic, n_day, 1)
-model2.integrate()
+# run the model stochastically for n_day_stochastic
+model.make_times(0, n_day_stochastic, 0.2)
+model.integrate('continuous_time_stochastic')
 
-# splice the times and solutions of the two models together
+model.make_times(n_day_stochastic, n_day, 1)
+model.integrate(is_continue=True)
+
 solution = {}
-times = None
-for model in [model1, model2]:
-    for key in model.compartments.keys():
-        new_solution = numpy.copy(model.get_compartment_soln(key))
-        if key not in solution:
-            solution[key] = new_solution
-        else:
-            solution[key] = numpy.concatenate(
-                (solution[key], new_solution[1:]), axis=0)
-    if times is None:
-        times = copy.deepcopy(model.target_times)
-    else:
-        times.extend(model.target_times[1:])
+for key in model.compartments.keys():
+    solution[key] = model.get_compartment_soln(key)
 
 plot_overlays(
-    times,
+    model.times,
     [solution],
     "Persons",
     "Compartments",
