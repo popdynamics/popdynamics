@@ -146,18 +146,20 @@ def plot_overlays(times, solutions, ylabel, title, png):
 out_dir = "mix_sir_graphs"
 basepop.ensure_out_dir(out_dir)
 
-model = SirModel({'start_population': 300})
+model = SirModel({'start_population': 100})
 
 # run the model stochastically for n_day_stochastic
 n_day_start = 0
 n_day_step = 1
 n_day_end = n_day_step
 n_day_final = 50
-method = 'explicit'
-dt = 1
-method = 'discrete_time_stochastic'
+pop_cutoff = 3
+
+method = 'continuous_time_stochastic'
 dt = 0.2
-print('run', method, n_day_start, n_day_end, dt)
+
+print('time=[%d, %d) %s min_pop=%.2f' % \
+    (n_day_start, n_day_end, method, dt))
 model.make_times(n_day_start, n_day_end, dt)
 model.integrate(method=method)
 
@@ -165,15 +167,14 @@ while n_day_end < n_day_final:
     n_day_start = n_day_end
     n_day_end = min(n_day_final, n_day_start + n_day_step)
     min_pop = min(model.compartments.values())
-    if min_pop > 5:
+    if min_pop > pop_cutoff:
         method = 'explicit'
         dt = 1
     else:
-        method = 'discrete_time_stochastic'
+        method = 'continuous_time_stochastic'
         dt = 0.2
-        # method = 'explicit'
-        # dt = 1
-    print('run', method, n_day_start, n_day_end, dt, min_pop, model.compartments)
+    print('time=[%d, %d) %s min_pop=%.2f' % \
+          (n_day_start, n_day_end, method, dt))
     model.make_times(n_day_start, n_day_end, dt)
     model.integrate(method=method, is_continue=True)
 

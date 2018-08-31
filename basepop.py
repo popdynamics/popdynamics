@@ -715,13 +715,18 @@ class BaseModel(object):
                 self.events.append((label, None, val))
 
     def integrate_continuous_time_stochastic(self, y):
+
         """
-        Run a continuous-time stochastic simulation. This uses the Gillespie
+        Run a continuous-time stochastic simulation. dT is determined
+        by the rates of events. This uses the Gillespie
         algorithm to pick a random event out of an set of event rates. The dt
         is estimated from the rates. Events are picked between set time-points
         until the dt fills out the time interval.
         """
+
         self.compartments = self.convert_list_to_compartments(y)
+        for label in self.compartments:
+            self.compartments[label] = int(self.compartments[label])
 
         n_compartment = len(y)
         n_time = len(self.target_times)
@@ -772,12 +777,14 @@ class BaseModel(object):
 
     def integrate_discrete_time_stochastic(self, y):
         """
-        Run a discrete-time stochastic simulation. This uses the Tau-leaping
+        Run a discrete-time stochastic simulation - dt is fixed.
+        This uses the Tau-leaping
         extension to the Gillespie algorithm, with a Poisson estimator
-        to estimate multiple events in a time-interval. dt is set
-        between time intervals.
+        to estimate multiple events in a time-interval.
         """
         self.compartments = self.convert_list_to_compartments(y)
+        for label in self.compartments:
+            self.compartments[label] = int(self.compartments[label])
 
         n_compartment = len(y)
         n_time = len(self.target_times)
@@ -864,8 +871,6 @@ class BaseModel(object):
 
         elif method == 'discrete_time_stochastic':
             self.integrate_discrete_time_stochastic(y)
-
-        print("Basemodel.integrate", len(self.target_times), self.soln_array.shape)
 
         if is_continue:
             self.soln_array = numpy.concatenate(
