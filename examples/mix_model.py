@@ -103,6 +103,39 @@ class SirModel(basepop.BaseModel):
             old_div(self.compartments["infectious"], self.vars["population"])
 
 
+
+def run_model():
+    model = SirModel({'start_population': 100})
+
+    # run the model stochastically for n_day_stochastic
+    n_day_start = 0
+    n_day_step = 1
+    n_day_end = n_day_step
+    n_day_final = 50
+    pop_cutoff = 3
+
+    method = 'continuous_time_stochastic'
+    dt = 0.2
+
+    model.make_times(n_day_start, n_day_end, dt)
+    model.integrate(method=method)
+
+    while n_day_end < n_day_final:
+        n_day_start = n_day_end
+        n_day_end = min(n_day_final, n_day_start + n_day_step)
+        min_pop = min(model.compartments.values())
+        if min_pop > pop_cutoff:
+            method = 'explicit'
+            dt = 0.2
+        else:
+            method = 'continuous_time_stochastic'
+            dt = 0.2
+        model.make_times(n_day_start, n_day_end, dt)
+        model.integrate(method=method, is_continue=True)
+
+    return model
+
+
 # Plotting functions for the model
 
 def plot_overlays(times, solutions, ylabel, title, png):
@@ -141,53 +174,30 @@ def plot_overlays(times, solutions, ylabel, title, png):
     pylab.savefig(png)
 
 
+
+def plot_populations(models, png):
+    times = models[0].times
+    solutions = []
+    for model in models:
+        solution = {}
+        for key in model.compartments.keys():
+            solution[key] = model.get_compartment_soln(key)
+        solutions.append(solution)
+    plot_overlays(times, solutions, "persons", "Populations", png)
+
+
 # The main routine
 
 out_dir = "mix_sir_graphs"
 basepop.ensure_out_dir(out_dir)
+# stochastic discrete-time models
+n_replica = 20
+models = []
+for i in range(n_replica):
+    models.append(run_model())
 
-model = SirModel({'start_population': 100})
-
-# run the model stochastically for n_day_stochastic
-n_day_start = 0
-n_day_step = 1
-n_day_end = n_day_step
-n_day_final = 50
-pop_cutoff = 3
-
-method = 'continuous_time_stochastic'
-dt = 0.2
-
-print('time=[%d, %d) %s min_pop=%.2f' % \
-    (n_day_start, n_day_end, method, dt))
-model.make_times(n_day_start, n_day_end, dt)
-model.integrate(method=method)
-
-while n_day_end < n_day_final:
-    n_day_start = n_day_end
-    n_day_end = min(n_day_final, n_day_start + n_day_step)
-    min_pop = min(model.compartments.values())
-    if min_pop > pop_cutoff:
-        method = 'explicit'
-        dt = 1
-    else:
-        method = 'continuous_time_stochastic'
-        dt = 0.2
-    print('time=[%d, %d) %s min_pop=%.2f' % \
-          (n_day_start, n_day_end, method, dt))
-    model.make_times(n_day_start, n_day_end, dt)
-    model.integrate(method=method, is_continue=True)
-
-solution = {}
-for key in model.compartments.keys():
-    solution[key] = model.get_compartment_soln(key)
-
-plot_overlays(
-    model.times,
-    [solution],
-    "Persons",
-    "Compartments",
-    os.path.join(out_dir, 'compartments'))
+plot_populations(
+    models, os.path.join(out_dir, "compartment_sizes.png"))
 
 basepop.open_pngs_in_dir(out_dir)
 

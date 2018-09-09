@@ -24,8 +24,8 @@ try:
 except Exception:
     print("Unable to load scipy")
 
-
 # General file-handling methods for use in examples
+
 
 def ensure_out_dir(out_dir):
     """
@@ -48,6 +48,7 @@ def open_pngs_in_dir(out_dir):
 
 
 # function used by BaseModel in data manipulation
+
 
 def add_unique_tuple_to_list(a_list, a_tuple):
     """
@@ -81,8 +82,13 @@ def label_intersects_tags(label, tags):
 
 # Math functions to build scale-up functions
 
+
 def make_sigmoidal_curve(
-        y_low=0, y_high=1., x_start=0, x_inflect=0.5, multiplier=1.):
+        y_low=0,
+        y_high=1.,
+        x_start=0,
+        x_inflect=0.5,
+        multiplier=1.):
     """
     Returns a sigmoidal curve function for smooth scaling of time-variant
     parameter values
@@ -98,6 +104,7 @@ def make_sigmoidal_curve(
     """
     amplitude = y_high - y_low
     if amplitude == 0:
+
         def curve(x):
             return y_low
 
@@ -120,6 +127,7 @@ def make_sigmoidal_curve(
 def make_constant_function(value):
     def curve(x):
         return value
+
     return curve
 
 
@@ -171,6 +179,7 @@ def pick_event(event_intervals):
 
 
 # The Base model
+
 
 class BaseModel(object):
     """
@@ -472,7 +481,10 @@ class BaseModel(object):
 
         assert type(label) is str, 'Compartment label not string when setting infection death rate'
         assert type(param_label) is str, 'Parameter label not string when setting infection death rate'
-        add_unique_tuple_to_list(self.infection_death_rate_flows, (label, self.params[param_label]))
+        add_unique_tuple_to_list(
+            self.infection_death_rate_flows,
+            (label,
+             self.params[param_label]))
 
     def set_fixed_transfer_rate_flow(self, from_label, to_label, param_label):
         """
@@ -487,7 +499,11 @@ class BaseModel(object):
 
         assert type(from_label) is str, 'Origin compartment label not string for setting fixed transfer rate'
         assert type(to_label) is str, 'Destination compartment label not string for setting fixed transfer rate'
-        add_unique_tuple_to_list(self.fixed_transfer_rate_flows, (from_label, to_label, self.params[param_label]))
+        add_unique_tuple_to_list(
+            self.fixed_transfer_rate_flows,
+            (from_label,
+             to_label,
+             self.params[param_label]))
 
     def set_var_transfer_rate_flow(self, from_label, to_label, var_label):
         """
@@ -506,7 +522,11 @@ class BaseModel(object):
         assert type(from_label) is str, 'Origin compartment label not string for setting variable transfer rate'
         assert type(to_label) is str, 'Destination compartment label not string for setting variable transfer rate'
         assert type(var_label) is str, 'Function label not string for setting fixed transfer rate'
-        add_unique_tuple_to_list(self.var_transfer_rate_flows, (from_label, to_label, var_label))
+        add_unique_tuple_to_list(
+            self.var_transfer_rate_flows,
+            (from_label,
+             to_label,
+             var_label))
 
     def set_var_entry_rate_flow(self, label, var_label):
         """
@@ -715,7 +735,6 @@ class BaseModel(object):
                 self.events.append((label, None, val))
 
     def integrate_continuous_time_stochastic(self, y):
-
         """
         Run a continuous-time stochastic simulation. dT is determined
         by the rates of events. This uses the Gillespie
@@ -754,7 +773,7 @@ class BaseModel(object):
                     i_event = pick_event(event_rates)
 
                     total_rate = sum(event_rates)
-                    dt = old_div(- math.log(random.random()), total_rate)
+                    dt = old_div(-math.log(random.random()), total_rate)
 
                     from_label, to_label, rate = self.events[i_event]
                     if from_label and to_label:
@@ -874,7 +893,9 @@ class BaseModel(object):
 
         if is_continue:
             self.soln_array = numpy.concatenate(
-                (self.save_soln_array, self.soln_array[1:]), 0)
+                (self.save_soln_array,
+                 self.soln_array[1:]),
+                0)
             self.times.extend(self.target_times[1:])
         else:
             self.times = copy.deepcopy(self.target_times)
@@ -931,12 +952,11 @@ class BaseModel(object):
         self.fraction_soln = {}
         for label in self.labels:
             self.fraction_soln[label] = [
-                old_div(v, t)
-                for v, t
-                in zip(
+                old_div(v,
+                        t) for v,
+                t in zip(
                     self.population_soln[label],
-                    self.get_var_soln('population')
-                )
+                    self.get_var_soln('population'))
             ]
 
     def get_compartment_soln(self, label):
@@ -1040,14 +1060,11 @@ class BaseModel(object):
 
         def apply_styles(graph, styles):
             graph.graph_attr.update(
-                ('graph' in styles and styles['graph']) or {}
-            )
+                ('graph' in styles and styles['graph']) or {})
             graph.node_attr.update(
-                ('nodes' in styles and styles['nodes']) or {}
-            )
+                ('nodes' in styles and styles['nodes']) or {})
             graph.edge_attr.update(
-                ('edges' in styles and styles['edges']) or {}
-            )
+                ('edges' in styles and styles['edges']) or {})
             return graph
 
         def num_str(f):
@@ -1075,9 +1092,15 @@ class BaseModel(object):
         try:
             self.graph.render(base)
         except:
-            print("Error running graphviz: probably not installed on your system")
+            print(
+                "Error running graphviz: probably not installed on your system"
+            )
 
-    def check_converged_compartment_fraction(self, label, equil_time, test_fraction_diff):
+    def check_converged_compartment_fraction(
+            self,
+            label,
+            equil_time,
+            test_fraction_diff):
         """
         Numerically determine whether a compartment's proportion has converged to reach an approximate equilibrium
 
